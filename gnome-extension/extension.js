@@ -48,6 +48,9 @@ function bucketSeconds(rangeSeconds) {
 const GAP_THRESHOLD  = 30;   // seconds — gaps longer than this break the line
 
 const TIME_RANGES = [
+    {label: '15m', seconds: 900},
+    {label: '1h',  seconds: 3600},
+    {label: '3h',  seconds: 10800},
     {label: '6h',  seconds: 21600},
     {label: '24h', seconds: 86400},
     {label: '7d',  seconds: 604800},

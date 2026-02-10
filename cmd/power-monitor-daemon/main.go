@@ -2,10 +2,13 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"sort"
+	"strings"
 	"syscall"
 	"time"
 
@@ -16,6 +19,7 @@ import (
 
 func main() {
 	verbose := flag.Bool("verbose", false, "enable verbose logging")
+	resetDB := flag.Bool("reset-db", false, "delete the database and start fresh")
 	flag.Parse()
 
 	dataDir := os.Getenv("XDG_DATA_HOME")
@@ -26,6 +30,16 @@ func main() {
 	dbPath := filepath.Join(dataDir, "power-monitor", "data.db")
 	if err := os.MkdirAll(filepath.Dir(dbPath), 0755); err != nil {
 		log.Fatalf("create data dir: %v", err)
+	}
+
+	if *resetDB {
+		for _, suffix := range []string{"", "-wal", "-shm"} {
+			if err := os.Remove(dbPath + suffix); err != nil && !os.IsNotExist(err) {
+				log.Fatalf("delete database: %v", err)
+			}
+		}
+		log.Println("database deleted:", dbPath)
+		return
 	}
 
 	store, err := storage.Open(dbPath)
@@ -99,16 +113,51 @@ func main() {
 					}
 					log.Printf("processes: %d active, top %d captured %d/%d ticks (%.1f%%)",
 						stats.TotalProcs, len(procSamples), stats.CapturedTicks, stats.TotalTicks, capturedPct)
+					var pProcs, eProcs []collector.ProcessSample
 					for _, s := range procSamples {
-						log.Printf("  pid=%d comm=%s ticks=%d cpu=%d", s.PID, s.Comm, s.CPUTicksDelta, s.LastCPU)
-					}
-					for cpuID, ticks := range stats.PerCoreTicks {
-						coreType := "E"
-						if procCollector.IsPCore(cpuID) {
-							coreType = "P"
+						if procCollector.IsPCore(s.LastCPU) {
+							pProcs = append(pProcs, s)
+						} else {
+							eProcs = append(eProcs, s)
 						}
-						log.Printf("  core %d (%s): %d ticks", cpuID, coreType, ticks)
 					}
+					if len(pProcs) > 0 {
+						log.Printf("  P-core processes:")
+						for _, s := range pProcs {
+							log.Printf("    pid=%d comm=%s ticks=%d cpu=%d", s.PID, s.Comm, s.CPUTicksDelta, s.LastCPU)
+						}
+					}
+					if len(eProcs) > 0 {
+						log.Printf("  E-core processes:")
+						for _, s := range eProcs {
+							log.Printf("    pid=%d comm=%s ticks=%d cpu=%d", s.PID, s.Comm, s.CPUTicksDelta, s.LastCPU)
+						}
+					}
+					var pTicks, eTicks int64
+					var pCores, eCores []int
+					for cpuID, isPCore := range procCollector.CPUIDs() {
+						if isPCore {
+							pCores = append(pCores, cpuID)
+						} else {
+							eCores = append(eCores, cpuID)
+						}
+					}
+					sort.Ints(pCores)
+					sort.Ints(eCores)
+					var pParts []string
+					for _, id := range pCores {
+						t := stats.PerCoreTicks[id]
+						pTicks += t
+						pParts = append(pParts, fmt.Sprintf("[%d]=%d", id, t))
+					}
+					var eParts []string
+					for _, id := range eCores {
+						t := stats.PerCoreTicks[id]
+						eTicks += t
+						eParts = append(eParts, fmt.Sprintf("[%d]=%d", id, t))
+					}
+					log.Printf("  P-cores (%d ticks): %s", pTicks, strings.Join(pParts, "  "))
+					log.Printf("  E-cores (%d ticks): %s", eTicks, strings.Join(eParts, "  "))
 				}
 				if err := store.InsertProcessSamples(procSamples); err != nil {
 					log.Printf("store process samples: %v", err)

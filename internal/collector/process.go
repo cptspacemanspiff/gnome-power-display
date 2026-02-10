@@ -39,6 +39,11 @@ func (pc *ProcessCollector) IsPCore(cpuID int) bool {
 	return pc.cpuTopology[cpuID]
 }
 
+// CPUIDs returns all known CPU IDs and whether each is a P-core.
+func (pc *ProcessCollector) CPUIDs() map[int]bool {
+	return pc.cpuTopology
+}
+
 // detectTopology determines P-core vs E-core for each CPU.
 // On hybrid Intel, E-cores have a lower base frequency than P-cores.
 // On non-hybrid systems, all cores are marked as P-cores.
