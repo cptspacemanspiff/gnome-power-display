@@ -94,12 +94,23 @@ class PowerMonitorIndicator extends PanelMenu.Button {
         this._proxy = null;
         this._createProxy();
 
+        this._startTimer();
+        this._settingsChangedId = this._settings.connect('changed::refresh-interval', () => {
+            this._startTimer();
+        });
+        this._refresh();
+    }
+
+    _startTimer() {
+        if (this._timerId) {
+            GLib.source_remove(this._timerId);
+            this._timerId = null;
+        }
         const interval = this._settings.get_int('refresh-interval');
         this._timerId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, interval, () => {
             this._refresh();
             return GLib.SOURCE_CONTINUE;
         });
-        this._refresh();
     }
 
     _createProxy() {
@@ -745,6 +756,10 @@ class PowerMonitorIndicator extends PanelMenu.Button {
     }
 
     destroy() {
+        if (this._settingsChangedId) {
+            this._settings.disconnect(this._settingsChangedId);
+            this._settingsChangedId = null;
+        }
         if (this._timerId) {
             GLib.source_remove(this._timerId);
             this._timerId = null;

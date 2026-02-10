@@ -23,3 +23,21 @@ type SleepEvent struct {
 	WakeTime  int64  `json:"wake_time"`
 	Type      string `json:"type"` // "suspend", "hibernate", or "unknown"
 }
+
+// ProcessSample holds a per-process CPU usage snapshot for one sampling interval.
+type ProcessSample struct {
+	Timestamp     int64  `json:"timestamp"`
+	PID           int    `json:"pid"`
+	Comm          string `json:"comm"`
+	Cmdline       string `json:"cmdline"`
+	CPUTicksDelta int64  `json:"cpu_ticks_delta"`
+	LastCPU       int    `json:"last_cpu"`
+}
+
+// CPUFreqSample holds the frequency of a single CPU core at a point in time.
+type CPUFreqSample struct {
+	Timestamp int64 `json:"timestamp"`
+	CPUID     int   `json:"cpu_id"`
+	FreqKHz   int64 `json:"freq_khz"`
+	IsPCore   bool  `json:"is_p_core"`
+}

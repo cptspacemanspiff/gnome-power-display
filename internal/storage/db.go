@@ -37,6 +37,26 @@ CREATE TABLE IF NOT EXISTS sleep_events (
 );
 CREATE INDEX IF NOT EXISTS idx_sleep_ts ON sleep_events(sleep_time);
 
+CREATE TABLE IF NOT EXISTS process_samples (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	timestamp INTEGER NOT NULL,
+	pid INTEGER NOT NULL,
+	comm TEXT NOT NULL,
+	cmdline TEXT NOT NULL,
+	cpu_ticks_delta INTEGER NOT NULL,
+	last_cpu INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_process_ts ON process_samples(timestamp);
+
+CREATE TABLE IF NOT EXISTS cpu_freq_samples (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	timestamp INTEGER NOT NULL,
+	cpu_id INTEGER NOT NULL,
+	freq_khz INTEGER NOT NULL,
+	is_p_core INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_cpufreq_ts ON cpu_freq_samples(timestamp);
+
 `
 
 // DB wraps a SQLite database for power monitor data.
@@ -154,6 +174,102 @@ func (d *DB) BacklightSamplesInRange(from, to int64) ([]collector.BacklightSampl
 		if err := rows.Scan(&s.Timestamp, &s.Brightness, &s.MaxBrightness); err != nil {
 			return nil, err
 		}
+		samples = append(samples, s)
+	}
+	return samples, rows.Err()
+}
+
+// InsertProcessSamples batch-inserts process samples in a single transaction.
+func (d *DB) InsertProcessSamples(samples []collector.ProcessSample) error {
+	if len(samples) == 0 {
+		return nil
+	}
+	tx, err := d.db.Begin()
+	if err != nil {
+		return err
+	}
+	stmt, err := tx.Prepare("INSERT INTO process_samples (timestamp, pid, comm, cmdline, cpu_ticks_delta, last_cpu) VALUES (?, ?, ?, ?, ?, ?)")
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+	defer stmt.Close()
+	for _, s := range samples {
+		if _, err := stmt.Exec(s.Timestamp, s.PID, s.Comm, s.Cmdline, s.CPUTicksDelta, s.LastCPU); err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// InsertCPUFreqSamples batch-inserts CPU frequency samples in a single transaction.
+func (d *DB) InsertCPUFreqSamples(samples []collector.CPUFreqSample) error {
+	if len(samples) == 0 {
+		return nil
+	}
+	tx, err := d.db.Begin()
+	if err != nil {
+		return err
+	}
+	stmt, err := tx.Prepare("INSERT INTO cpu_freq_samples (timestamp, cpu_id, freq_khz, is_p_core) VALUES (?, ?, ?, ?)")
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+	defer stmt.Close()
+	for _, s := range samples {
+		isPCore := 0
+		if s.IsPCore {
+			isPCore = 1
+		}
+		if _, err := stmt.Exec(s.Timestamp, s.CPUID, s.FreqKHz, isPCore); err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// ProcessSamplesInRange returns process samples within the given time range.
+func (d *DB) ProcessSamplesInRange(from, to int64) ([]collector.ProcessSample, error) {
+	rows, err := d.db.Query(
+		"SELECT timestamp, pid, comm, cmdline, cpu_ticks_delta, last_cpu FROM process_samples WHERE timestamp >= ? AND timestamp <= ? ORDER BY timestamp",
+		from, to,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var samples []collector.ProcessSample
+	for rows.Next() {
+		var s collector.ProcessSample
+		if err := rows.Scan(&s.Timestamp, &s.PID, &s.Comm, &s.Cmdline, &s.CPUTicksDelta, &s.LastCPU); err != nil {
+			return nil, err
+		}
+		samples = append(samples, s)
+	}
+	return samples, rows.Err()
+}
+
+// CPUFreqSamplesInRange returns CPU frequency samples within the given time range.
+func (d *DB) CPUFreqSamplesInRange(from, to int64) ([]collector.CPUFreqSample, error) {
+	rows, err := d.db.Query(
+		"SELECT timestamp, cpu_id, freq_khz, is_p_core FROM cpu_freq_samples WHERE timestamp >= ? AND timestamp <= ? ORDER BY timestamp",
+		from, to,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var samples []collector.CPUFreqSample
+	for rows.Next() {
+		var s collector.CPUFreqSample
+		var isPCore int
+		if err := rows.Scan(&s.Timestamp, &s.CPUID, &s.FreqKHz, &isPCore); err != nil {
+			return nil, err
+		}
+		s.IsPCore = isPCore != 0
 		samples = append(samples, s)
 	}
 	return samples, rows.Err()

@@ -32,6 +32,11 @@ const introspectXML = `
       <arg direction="in" type="x" name="to_epoch"/>
       <arg direction="out" type="s" name="json"/>
     </method>
+    <method name="GetProcessHistory">
+      <arg direction="in" type="x" name="from_epoch"/>
+      <arg direction="in" type="x" name="to_epoch"/>
+      <arg direction="out" type="s" name="json"/>
+    </method>
   </interface>
 ` + introspect.IntrospectDataString + `
 </node>`
@@ -95,6 +100,18 @@ func (s *Service) GetHistory(fromEpoch, toEpoch int64) (string, *godbus.Error) {
 func (s *Service) GetSleepEvents(fromEpoch, toEpoch int64) (string, *godbus.Error) {
 	events, _ := s.store.SleepEventsInRange(fromEpoch, toEpoch)
 	data, err := json.Marshal(events)
+	if err != nil {
+		return "", godbus.MakeFailedError(err)
+	}
+	return string(data), nil
+}
+
+// GetProcessHistory returns process CPU usage and CPU frequency samples in a time range as JSON.
+func (s *Service) GetProcessHistory(fromEpoch, toEpoch int64) (string, *godbus.Error) {
+	procs, _ := s.store.ProcessSamplesInRange(fromEpoch, toEpoch)
+	freqs, _ := s.store.CPUFreqSamplesInRange(fromEpoch, toEpoch)
+	result := map[string]any{"processes": procs, "cpu_freq": freqs}
+	data, err := json.Marshal(result)
 	if err != nil {
 		return "", godbus.MakeFailedError(err)
 	}

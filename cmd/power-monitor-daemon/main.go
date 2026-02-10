@@ -57,7 +57,10 @@ func main() {
 		}()
 	}
 
-	// Collect battery and backlight on a ticker.
+	// Start process collector.
+	procCollector := collector.NewProcessCollector(10)
+
+	// Collect battery, backlight, and process data on a ticker.
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
@@ -87,6 +90,34 @@ func main() {
 				}
 			} else if *verbose {
 				log.Printf("collect backlight: %v", err)
+			}
+			if procSamples, freqSamples, stats, err := procCollector.Collect(); err == nil {
+				if *verbose {
+					capturedPct := 0.0
+					if stats.TotalTicks > 0 {
+						capturedPct = float64(stats.CapturedTicks) / float64(stats.TotalTicks) * 100
+					}
+					log.Printf("processes: %d active, top %d captured %d/%d ticks (%.1f%%)",
+						stats.TotalProcs, len(procSamples), stats.CapturedTicks, stats.TotalTicks, capturedPct)
+					for _, s := range procSamples {
+						log.Printf("  pid=%d comm=%s ticks=%d cpu=%d", s.PID, s.Comm, s.CPUTicksDelta, s.LastCPU)
+					}
+					for cpuID, ticks := range stats.PerCoreTicks {
+						coreType := "E"
+						if procCollector.IsPCore(cpuID) {
+							coreType = "P"
+						}
+						log.Printf("  core %d (%s): %d ticks", cpuID, coreType, ticks)
+					}
+				}
+				if err := store.InsertProcessSamples(procSamples); err != nil {
+					log.Printf("store process samples: %v", err)
+				}
+				if err := store.InsertCPUFreqSamples(freqSamples); err != nil {
+					log.Printf("store cpu freq samples: %v", err)
+				}
+			} else if *verbose {
+				log.Printf("collect processes: %v", err)
 			}
 		case <-sigCh:
 			log.Println("shutting down")
