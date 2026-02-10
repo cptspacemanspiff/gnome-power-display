@@ -1,0 +1,8 @@
+{
+  "uuid": "power-monitor@gnome-power-display",
+  "name": "Power Monitor",
+  "description": "Display power consumption, battery status, and sleep history from the power-monitor-daemon",
+  "shell-version": ["45", "46", "47", "48", "49"],
+  "url": "https://github.com/cptspacemanspiff/gnome-power-display",
+  "version": 1
+}

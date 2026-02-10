@@ -1,0 +1,51 @@
+.power-monitor-panel-button {
+  -natural-hpadding: 6px;
+}
+
+.power-monitor-stats {
+  padding: 8px 12px;
+  min-width: 380px;
+}
+
+.power-monitor-stat-big {
+  font-size: 1.4em;
+  font-weight: bold;
+}
+
+.power-monitor-stat-status {
+  font-size: 0.9em;
+  color: rgba(255, 255, 255, 0.6);
+  margin-top: 2px;
+}
+
+.power-monitor-graph-area {
+  margin: 2px 0;
+  border-radius: 8px;
+}
+
+.power-monitor-time-selector {
+  margin: 4px 0;
+}
+
+.power-monitor-time-btn {
+  margin: 0 3px;
+  padding: 4px 12px;
+  min-width: 44px;
+  border-radius: 12px;
+  font-size: 0.85em;
+}
+
+.power-monitor-time-btn:checked {
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
+.power-monitor-back-btn {
+  min-width: 28px;
+  padding: 4px 8px;
+}
+
+.power-monitor-range-label {
+  font-size: 0.8em;
+  color: rgba(255, 255, 255, 0.5);
+  margin-left: 8px;
+}

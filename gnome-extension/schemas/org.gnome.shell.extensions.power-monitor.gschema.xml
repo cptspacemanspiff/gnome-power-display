@@ -1,0 +1,10 @@
+<schemalist>
+  <schema id="org.gnome.shell.extensions.power-monitor"
+          path="/org/gnome/shell/extensions/power-monitor@gnome-power-display/">
+    <key name="refresh-interval" type="i">
+      <default>5</default>
+      <summary>Refresh interval in seconds</summary>
+      <description>How often to update the panel display</description>
+    </key>
+  </schema>
+</schemalist>

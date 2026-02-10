@@ -1,0 +1,12 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "storage",
+    srcs = ["db.go"],
+    importpath = "github.com/cptspacemanspiff/gnome-power-display/internal/storage",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/collector",
+        "@com_github_mattn_go_sqlite3//:go-sqlite3",
+    ],
+)

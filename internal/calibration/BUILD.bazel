@@ -1,0 +1,11 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "calibration",
+    srcs = ["calibration.go"],
+    importpath = "github.com/cptspacemanspiff/gnome-power-display/internal/calibration",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/collector",
+    ],
+)

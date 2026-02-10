@@ -1,0 +1,13 @@
+load("@rules_go//go:def.bzl", "go_binary")
+
+go_binary(
+    name = "power-monitor-daemon",
+    srcs = ["main.go"],
+    importpath = "github.com/cptspacemanspiff/gnome-power-display/cmd/power-monitor-daemon",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//internal/collector",
+        "//internal/dbus",
+        "//internal/storage",
+    ],
+)
