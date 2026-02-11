@@ -59,6 +59,8 @@ class PowerMonitorIndicator extends PanelMenu.Button {
         this._sleepData = null;
         this._dragStart = null;
         this._dragEnd = null;
+        this._hoverX = null;
+        this._hoverSource = null;
 
         this._label = new St.Label({
             text: '-- W',
@@ -106,7 +108,7 @@ class PowerMonitorIndicator extends PanelMenu.Button {
         );
         this._customRange = {from, to};
         this._timeButtons.forEach(b => { b.checked = false; });
-        this._backBtn.visible = true;
+        this._backBtn.opacity = 255; this._backBtn.reactive = true;
         this._updateRangeLabel();
         this._refreshGraph();
     }
@@ -118,12 +120,13 @@ class PowerMonitorIndicator extends PanelMenu.Button {
             this._customRange = null;
             this._rangeIdx = prev.preset;
             this._timeButtons.forEach((b, j) => { b.checked = (j === prev.preset); });
-            this._rangeLabel.text = '';
-        } else {
+            this._rangeLabel.text = '';        } else {
             this._customRange = {from: prev.from, to: prev.to};
             this._updateRangeLabel();
         }
-        this._backBtn.visible = this._rangeStack.length > 0 || this._customRange !== null;
+        const showBack = this._rangeStack.length > 0 || this._customRange !== null;
+        this._backBtn.opacity = showBack ? 255 : 0;
+        this._backBtn.reactive = showBack;
         this._refreshGraph();
     }
 
@@ -172,7 +175,8 @@ class PowerMonitorIndicator extends PanelMenu.Button {
         this._backBtn = new St.Button({
             label: '\u25C0',
             style_class: 'power-monitor-time-btn power-monitor-back-btn',
-            visible: false,
+            opacity: 0,
+            reactive: false,
         });
         this._backBtn.connect('clicked', () => this._zoomOut());
         navBox.add_child(this._backBtn);
@@ -191,9 +195,8 @@ class PowerMonitorIndicator extends PanelMenu.Button {
                 this._rangeIdx = idx;
                 this._customRange = null;
                 this._rangeStack = [];
-                this._backBtn.visible = false;
-                this._rangeLabel.text = '';
-                this._refreshGraph();
+                this._backBtn.opacity = 0; this._backBtn.reactive = false;
+                this._rangeLabel.text = '';                this._refreshGraph();
             });
             this._timeButtons.push(btn);
             navBox.add_child(btn);
@@ -203,12 +206,16 @@ class PowerMonitorIndicator extends PanelMenu.Button {
             text: '',
             style_class: 'power-monitor-range-label',
             x_expand: true,
-            x_align: Clutter.ActorAlign.END,
+            x_align: Clutter.ActorAlign.CENTER,
         });
-        navBox.add_child(this._rangeLabel);
+
+        const navContainer = new St.BoxLayout({vertical: true, x_expand: true});
+        navBox.x_expand = true;
+        navContainer.add_child(navBox);
+        navContainer.add_child(this._rangeLabel);
 
         const navItem = new PopupMenu.PopupBaseMenuItem({reactive: false});
-        navItem.add_child(navBox);
+        navItem.add_child(navContainer);
         this.menu.addMenuItem(navItem);
 
         // Battery level graph
@@ -217,7 +224,8 @@ class PowerMonitorIndicator extends PanelMenu.Button {
             width: 380, height: 120, reactive: true,
         });
         this._batteryGraphArea.connect('repaint', (a) => {
-            drawBatteryGraph(a, this._graphData, this._sleepData, this._getTimeRange(), this._dragStart, this._dragEnd);
+            const hx = this._hoverSource === this._batteryGraphArea ? this._hoverX : null;
+            drawBatteryGraph(a, this._graphData, this._sleepData, this._getTimeRange(), this._dragStart, this._dragEnd, hx);
         });
         setupDrag(this._batteryGraphArea, this);
         const batItem = new PopupMenu.PopupBaseMenuItem({reactive: false});
@@ -230,7 +238,8 @@ class PowerMonitorIndicator extends PanelMenu.Button {
             width: 380, height: 120, reactive: true,
         });
         this._energyGraphArea.connect('repaint', (a) => {
-            drawEnergyGraph(a, this._graphData, this._sleepData, this._getTimeRange(), this._dragStart, this._dragEnd);
+            const hx = this._hoverSource === this._energyGraphArea ? this._hoverX : null;
+            drawEnergyGraph(a, this._graphData, this._sleepData, this._getTimeRange(), this._dragStart, this._dragEnd, hx);
         });
         setupDrag(this._energyGraphArea, this);
         const engItem = new PopupMenu.PopupBaseMenuItem({reactive: false});

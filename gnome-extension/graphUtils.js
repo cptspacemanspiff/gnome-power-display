@@ -267,6 +267,63 @@ export function drawNoDataRegions(cr, gw, gh, from, rangeSeconds, samples, sleep
     }
 }
 
+// Binary search for nearest sample to a timestamp
+export function findNearestSample(samples, timestamp) {
+    if (!samples || samples.length === 0) return null;
+    let lo = 0, hi = samples.length - 1;
+    while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (samples[mid].timestamp < timestamp) lo = mid + 1;
+        else hi = mid;
+    }
+    // Check lo and lo-1 for closest
+    if (lo > 0 && Math.abs(samples[lo - 1].timestamp - timestamp) < Math.abs(samples[lo].timestamp - timestamp))
+        return samples[lo - 1];
+    return samples[lo];
+}
+
+// Draw vertical dashed hover line
+export function drawHoverLine(cr, gw, gh, hoverX) {
+    if (hoverX < MARGIN.left || hoverX > MARGIN.left + gw) return;
+    cr.save();
+    cr.setSourceRGBA(1, 1, 1, 0.5);
+    cr.setLineWidth(0.5);
+    cr.setDash([3, 3], 0);
+    cr.moveTo(hoverX, MARGIN.top);
+    cr.lineTo(hoverX, MARGIN.top + gh);
+    cr.stroke();
+    cr.restore();
+}
+
+// Draw hover tooltip text, flipping side if cursor is on right half
+export function drawHoverTooltip(cr, gw, gh, hoverX, lines) {
+    cr.setFontSize(9);
+    const rightHalf = hoverX > MARGIN.left + gw / 2;
+    const padding = 6;
+    // Measure max text width (approximate)
+    const maxWidth = Math.max(...lines.map(l => l.length * 5.5));
+    const boxW = maxWidth + padding * 2;
+    const boxH = lines.length * 13 + padding * 2 - 4;
+    const boxX = rightHalf ? hoverX - boxW - 8 : hoverX + 8;
+    const boxY = MARGIN.top + 4;
+
+    // Background
+    cr.setSourceRGBA(0.1, 0.1, 0.1, 0.85);
+    cr.rectangle(boxX, boxY, boxW, boxH);
+    cr.fill();
+    // Border
+    cr.setSourceRGBA(1, 1, 1, 0.2);
+    cr.setLineWidth(0.5);
+    cr.rectangle(boxX, boxY, boxW, boxH);
+    cr.stroke();
+    // Text
+    cr.setSourceRGBA(1, 1, 1, 0.9);
+    for (let i = 0; i < lines.length; i++) {
+        cr.moveTo(boxX + padding, boxY + padding + 9 + i * 13);
+        cr.showText(lines[i]);
+    }
+}
+
 export function drawSelectionOverlay(cr, gw, gh, dragStart, dragEnd) {
     if (dragStart === null || dragEnd === null) return;
     const x1 = Math.max(MARGIN.left, Math.min(dragStart, dragEnd));

@@ -6,9 +6,10 @@ import {
     drawBackground, drawTitle, drawMidGridLine, drawBottomAxis,
     drawYLabels, drawNoDataMessage, drawTimeAxis, drawSleepRegions,
     drawNoDataRegions, drawSelectionOverlay,
+    findNearestSample, drawHoverLine, drawHoverTooltip,
 } from './graphUtils.js';
 
-export function drawBatteryGraph(area, graphData, sleepData, timeRange, dragStart, dragEnd) {
+export function drawBatteryGraph(area, graphData, sleepData, timeRange, dragStart, dragEnd, hoverX) {
     const cr = area.get_context();
     const [width, height] = area.get_surface_size();
     const gw = width - MARGIN.left - MARGIN.right;
@@ -72,12 +73,35 @@ export function drawBatteryGraph(area, graphData, sleepData, timeRange, dragStar
         drawNoDataMessage(cr, width, gh);
     }
 
+    // Hover indicator
+    if (hoverX !== null && dragStart === null && samples && samples.length > 0) {
+        drawHoverLine(cr, gw, gh, hoverX);
+        const timestamp = from + ((hoverX - MARGIN.left) / gw) * seconds;
+        const nearest = findNearestSample(samples, timestamp);
+        if (nearest) {
+            // Data point marker
+            const sx = MARGIN.left + ((nearest.timestamp - from) / seconds) * gw;
+            const sy = MARGIN.top + gh - (nearest.capacity_pct / 100) * gh;
+            cr.setSourceRGBA(...COL_GREEN);
+            cr.arc(sx, sy, 3, 0, 2 * Math.PI);
+            cr.fill();
+            // Tooltip
+            const watts = (nearest.power_uw / 1e6).toFixed(1);
+            const d = new Date(nearest.timestamp * 1000);
+            const time = `${d.getHours()}:${d.getMinutes().toString().padStart(2, '0')}`;
+            drawHoverTooltip(cr, gw, gh, hoverX, [
+                `${nearest.capacity_pct}%  ${watts} W`,
+                time,
+            ]);
+        }
+    }
+
     drawBottomAxis(cr, gw, gh);
     drawSelectionOverlay(cr, gw, gh, dragStart, dragEnd);
     cr.$dispose();
 }
 
-export function drawEnergyGraph(area, graphData, sleepData, timeRange, dragStart, dragEnd) {
+export function drawEnergyGraph(area, graphData, sleepData, timeRange, dragStart, dragEnd, hoverX) {
     const cr = area.get_context();
     const [width, height] = area.get_surface_size();
     const gw = width - MARGIN.left - MARGIN.right;
@@ -139,6 +163,26 @@ export function drawEnergyGraph(area, graphData, sleepData, timeRange, dragStart
         cr.setSourceRGBA(...(b.charging ? COL_GREEN : COL_BLUE));
         cr.rectangle(x, y, barWidth, barH);
         cr.fill();
+    }
+
+    // Hover indicator
+    if (hoverX !== null && dragStart === null && samples && samples.length > 0) {
+        drawHoverLine(cr, gw, gh, hoverX);
+        const bucketIdx = Math.floor((hoverX - MARGIN.left) / (gw / nBuckets));
+        if (bucketIdx >= 0 && bucketIdx < nBuckets) {
+            const b = buckets[bucketIdx];
+            if (b.count > 0) {
+                const avg = (b.sumPower / b.count / 1e6).toFixed(1);
+                const fmt = (epoch) => {
+                    const d = new Date(epoch * 1000);
+                    return `${d.getHours()}:${d.getMinutes().toString().padStart(2, '0')}`;
+                };
+                drawHoverTooltip(cr, gw, gh, hoverX, [
+                    `${avg} W avg`,
+                    `${fmt(b.start)} – ${fmt(b.start + bSec)}`,
+                ]);
+            }
+        }
     }
 
     drawBottomAxis(cr, gw, gh);

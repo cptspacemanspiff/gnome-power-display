@@ -10,13 +10,20 @@ export function setupDrag(area, indicator) {
         const [ax] = actor.get_transformed_position();
         indicator._dragStart = x - ax;
         indicator._dragEnd = null;
+        indicator._hoverX = null;
+        indicator._hoverSource = null;
         return Clutter.EVENT_STOP;
     });
     area.connect('motion-event', (actor, event) => {
-        if (indicator._dragStart === null) return Clutter.EVENT_PROPAGATE;
         const [x] = event.get_coords();
         const [ax] = actor.get_transformed_position();
-        indicator._dragEnd = x - ax;
+        const relX = x - ax;
+        if (indicator._dragStart !== null) {
+            indicator._dragEnd = relX;
+        } else {
+            indicator._hoverX = relX;
+            indicator._hoverSource = area;
+        }
         indicator._batteryGraphArea.queue_repaint();
         indicator._energyGraphArea.queue_repaint();
         return Clutter.EVENT_STOP;
@@ -36,6 +43,10 @@ export function setupDrag(area, indicator) {
             indicator._dragStart = null;
             indicator._dragEnd = null;
         }
+        indicator._hoverX = null;
+        indicator._hoverSource = null;
+        indicator._batteryGraphArea.queue_repaint();
+        indicator._energyGraphArea.queue_repaint();
         return Clutter.EVENT_PROPAGATE;
     });
 }
