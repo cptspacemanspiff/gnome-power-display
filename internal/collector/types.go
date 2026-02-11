@@ -24,6 +24,15 @@ type SleepEvent struct {
 	Type      string `json:"type"` // "suspend", "hibernate", or "unknown"
 }
 
+// PowerStateEvent records a power state transition (suspend, hibernate, shutdown, etc.).
+type PowerStateEvent struct {
+	StartTime     int64  `json:"start_time"`
+	EndTime       int64  `json:"end_time"`
+	Type          string `json:"type"`           // "suspend", "hibernate", "suspend-then-hibernate", "shutdown"
+	SuspendSecs   int64  `json:"suspend_secs"`   // seconds in suspend phase (0 if pure hibernate/shutdown)
+	HibernateSecs int64  `json:"hibernate_secs"` // seconds in hibernate phase (0 if pure suspend/shutdown)
+}
+
 // ProcessSample holds a per-process CPU usage snapshot for one sampling interval.
 type ProcessSample struct {
 	Timestamp     int64  `json:"timestamp"`

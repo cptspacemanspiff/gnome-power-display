@@ -37,6 +37,16 @@ CREATE TABLE IF NOT EXISTS sleep_events (
 );
 CREATE INDEX IF NOT EXISTS idx_sleep_ts ON sleep_events(sleep_time);
 
+CREATE TABLE IF NOT EXISTS power_state_events (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	start_time INTEGER NOT NULL,
+	end_time INTEGER NOT NULL,
+	type TEXT NOT NULL,
+	suspend_secs INTEGER NOT NULL DEFAULT 0,
+	hibernate_secs INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_power_state_ts ON power_state_events(start_time);
+
 CREATE TABLE IF NOT EXISTS process_samples (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
 	timestamp INTEGER NOT NULL,
@@ -275,11 +285,45 @@ func (d *DB) CPUFreqSamplesInRange(from, to int64) ([]collector.CPUFreqSample, e
 	return samples, rows.Err()
 }
 
-// SleepEventsInRange returns sleep events within the given time range.
+// InsertPowerStateEvent inserts a power state event, deduplicating by start_time.
+func (d *DB) InsertPowerStateEvent(e collector.PowerStateEvent) error {
+	_, err := d.db.Exec(
+		"INSERT INTO power_state_events (start_time, end_time, type, suspend_secs, hibernate_secs) SELECT ?, ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM power_state_events WHERE start_time = ?)",
+		e.StartTime, e.EndTime, e.Type, e.SuspendSecs, e.HibernateSecs, e.StartTime,
+	)
+	return err
+}
+
+// PowerStateEventsInRange returns power state events within the given time range.
+func (d *DB) PowerStateEventsInRange(from, to int64) ([]collector.PowerStateEvent, error) {
+	rows, err := d.db.Query(
+		"SELECT start_time, end_time, type, suspend_secs, hibernate_secs FROM power_state_events WHERE start_time >= ? AND start_time <= ? ORDER BY start_time",
+		from, to,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var events []collector.PowerStateEvent
+	for rows.Next() {
+		var e collector.PowerStateEvent
+		if err := rows.Scan(&e.StartTime, &e.EndTime, &e.Type, &e.SuspendSecs, &e.HibernateSecs); err != nil {
+			return nil, err
+		}
+		events = append(events, e)
+	}
+	return events, rows.Err()
+}
+
+// SleepEventsInRange returns sleep events from both the legacy sleep_events table
+// and the new power_state_events table, unified into SleepEvent format.
 func (d *DB) SleepEventsInRange(from, to int64) ([]collector.SleepEvent, error) {
 	rows, err := d.db.Query(
-		"SELECT sleep_time, wake_time, type FROM sleep_events WHERE sleep_time >= ? AND sleep_time <= ? ORDER BY sleep_time",
-		from, to,
+		`SELECT sleep_time, wake_time, type FROM sleep_events WHERE sleep_time >= ? AND sleep_time <= ?
+		 UNION ALL
+		 SELECT start_time, end_time, type FROM power_state_events WHERE start_time >= ? AND start_time <= ?
+		 ORDER BY 1`,
+		from, to, from, to,
 	)
 	if err != nil {
 		return nil, err

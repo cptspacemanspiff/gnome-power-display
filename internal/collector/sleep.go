@@ -1,30 +1,27 @@
 package collector
 
 import (
-	"log"
-	"time"
+	"log/slog"
 
 	"github.com/godbus/dbus/v5"
 )
 
-// SleepMonitor listens for systemd-logind PrepareForSleep/PrepareForShutdown signals.
+// SleepMonitor listens for systemd-logind PrepareForSleep/PrepareForShutdown signals
+// for debug logging. The file-based state log is the authoritative source of power
+// state events.
 type SleepMonitor struct {
-	conn       *dbus.Conn
-	events     chan SleepEvent
-	sleepTime  time.Time
-	sleepType  string // "suspend", "hibernate", or "unknown"
-	hibernating bool  // true if PrepareForShutdown fired (hibernate)
-	done       chan struct{}
+	conn *dbus.Conn
+	done chan struct{}
+	log  *slog.Logger
 }
 
 // NewSleepMonitor creates a new sleep monitor connected to the system bus.
-func NewSleepMonitor() (*SleepMonitor, error) {
+func NewSleepMonitor(logger *slog.Logger) (*SleepMonitor, error) {
 	conn, err := dbus.SystemBus()
 	if err != nil {
 		return nil, err
 	}
 
-	// Listen for both sleep and shutdown signals
 	for _, member := range []string{"PrepareForSleep", "PrepareForShutdown"} {
 		err = conn.AddMatchSignal(
 			dbus.WithMatchInterface("org.freedesktop.login1.Manager"),
@@ -36,17 +33,12 @@ func NewSleepMonitor() (*SleepMonitor, error) {
 	}
 
 	m := &SleepMonitor{
-		conn:   conn,
-		events: make(chan SleepEvent, 16),
-		done:   make(chan struct{}),
+		conn: conn,
+		done: make(chan struct{}),
+		log:  logger,
 	}
 	go m.listen()
 	return m, nil
-}
-
-// Events returns a channel of sleep events.
-func (m *SleepMonitor) Events() <-chan SleepEvent {
-	return m.events
 }
 
 // Close stops the monitor.
@@ -72,33 +64,14 @@ func (m *SleepMonitor) listen() {
 
 			switch sig.Name {
 			case "org.freedesktop.login1.Manager.PrepareForShutdown":
-				// PrepareForShutdown(true) fires before hibernate (and poweroff,
-				// but we won't see the false signal after poweroff).
 				if active {
-					m.hibernating = true
+					m.log.Info("system preparing for shutdown/hibernate")
 				}
-
 			case "org.freedesktop.login1.Manager.PrepareForSleep":
 				if active {
-					if m.hibernating {
-						m.sleepType = "hibernate"
-					} else {
-						m.sleepType = "suspend"
-					}
-					m.sleepTime = time.Now().Round(0) // Strip monotonic so Sub uses wall clock across suspend
-					log.Printf("system going to %s", m.sleepType)
+					m.log.Info("system going to sleep")
 				} else {
-					wakeTime := time.Now()
-					if !m.sleepTime.IsZero() {
-						m.events <- SleepEvent{
-							SleepTime: m.sleepTime.Unix(),
-							WakeTime:  wakeTime.Unix(),
-							Type:      m.sleepType,
-						}
-						log.Printf("woke up after %v (%s)", wakeTime.Sub(m.sleepTime), m.sleepType)
-					}
-					m.hibernating = false
-					m.sleepType = "unknown"
+					m.log.Info("system woke up")
 				}
 			}
 		case <-m.done:

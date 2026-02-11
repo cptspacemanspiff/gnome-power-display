@@ -1,0 +1,8 @@
+#!/bin/bash
+# Installed to /usr/lib/systemd/system-sleep/power-monitor-sleep-hook
+# systemd calls with: pre/post suspend/hibernate/hybrid-sleep/suspend-then-hibernate
+# SYSTEMD_SLEEP_ACTION env var gives the actual sleep action during suspend-then-hibernate.
+mkdir -p /var/lib/power-monitor
+echo "{\"ts\":$(date +%s),\"action\":\"$1\",\"what\":\"$2\",\"sleep_action\":\"${SYSTEMD_SLEEP_ACTION:-}\"}" \
+  >> /var/lib/power-monitor/state-log.jsonl
+chmod 666 /var/lib/power-monitor/state-log.jsonl
