@@ -62,9 +62,12 @@ const COL_GRID       = [1, 1, 1, 0.08];
 const COL_AXIS       = [1, 1, 1, 0.25];
 const COL_LABEL      = [1, 1, 1, 0.5];
 const COL_TITLE      = [1, 1, 1, 0.7];
-const COL_SLEEP_BG   = [0.3, 0.35, 0.55, 0.35];
-const COL_SLEEP_EDGE = [0.45, 0.5, 0.75, 0.5];
-const COL_SLEEP_LBL  = [0.65, 0.7, 0.9, 0.6];
+const COL_SLEEP_BG      = [0.3, 0.35, 0.55, 0.35];
+const COL_SLEEP_EDGE    = [0.45, 0.5, 0.75, 0.5];
+const COL_SLEEP_LBL     = [0.65, 0.7, 0.9, 0.6];
+const COL_SHUTDOWN_BG   = [0.55, 0.3, 0.3, 0.35];
+const COL_SHUTDOWN_EDGE = [0.75, 0.45, 0.45, 0.5];
+const COL_SHUTDOWN_LBL  = [0.9, 0.65, 0.65, 0.6];
 const COL_GREEN      = [0.30, 0.75, 0.40, 1.0];
 const COL_GREEN_FILL = [0.30, 0.75, 0.40, 0.25];
 const COL_GREEN_CHG  = [0.30, 0.75, 0.40, 0.45];
@@ -440,17 +443,25 @@ class PowerMonitorIndicator extends PanelMenu.Button {
         cr.fill();
     }
 
-    _drawSleepRegions(cr, margin, gw, gh, from, rangeSeconds) {
+    _drawSleepRegions(cr, margin, gw, gh, from, rangeSeconds, bucketSec) {
         if (!this._sleepData || this._sleepData.length === 0) return;
         for (const evt of this._sleepData) {
-            const x1 = Math.max(margin.left, margin.left + ((evt.sleep_time - from) / rangeSeconds) * gw);
-            const x2 = Math.min(margin.left + gw, margin.left + ((evt.wake_time - from) / rangeSeconds) * gw);
+            let sleepStart = evt.sleep_time;
+            let sleepEnd = evt.wake_time;
+            // Snap to bucket boundaries so edges align with bar slots
+            if (bucketSec) {
+                sleepStart = Math.floor((sleepStart - from) / bucketSec) * bucketSec + from;
+                sleepEnd = Math.ceil((sleepEnd - from) / bucketSec) * bucketSec + from;
+            }
+            const x1 = Math.max(margin.left, margin.left + ((sleepStart - from) / rangeSeconds) * gw);
+            const x2 = Math.min(margin.left + gw, margin.left + ((sleepEnd - from) / rangeSeconds) * gw);
             if (x2 <= x1) continue;
-            cr.setSourceRGBA(...COL_SLEEP_BG);
+            const isShutdown = evt.type === 'shutdown';
+            cr.setSourceRGBA(...(isShutdown ? COL_SHUTDOWN_BG : COL_SLEEP_BG));
             cr.rectangle(x1, margin.top, x2 - x1, gh);
             cr.fill();
             // Edge lines
-            cr.setSourceRGBA(...COL_SLEEP_EDGE);
+            cr.setSourceRGBA(...(isShutdown ? COL_SHUTDOWN_EDGE : COL_SLEEP_EDGE));
             cr.setLineWidth(0.5);
             for (const xv of [x1, x2]) {
                 cr.moveTo(xv, margin.top);
@@ -459,9 +470,15 @@ class PowerMonitorIndicator extends PanelMenu.Button {
             }
             // Label
             if (x2 - x1 > 28) {
-                cr.setSourceRGBA(...COL_SLEEP_LBL);
+                cr.setSourceRGBA(...(isShutdown ? COL_SHUTDOWN_LBL : COL_SLEEP_LBL));
                 cr.setFontSize(7);
-                const label = evt.type === 'hibernate' ? 'Hibernate' : 'Sleep';
+                let label;
+                switch (evt.type) {
+                    case 'hibernate': label = 'Hibernate'; break;
+                    case 'suspend-then-hibernate': label = 'S2H'; break;
+                    case 'shutdown': label = 'Shutdown'; break;
+                    default: label = 'Sleep'; break;
+                }
                 const lx = x1 + (x2 - x1) / 2 - (label.length * 2.5);
                 cr.moveTo(lx, margin.top + gh / 2 + 3);
                 cr.showText(label);
@@ -474,7 +491,8 @@ class PowerMonitorIndicator extends PanelMenu.Button {
         if (!samples || samples.length === 0) return;
         const gaps = [];
         // Gap at the start if first sample is late
-        if (samples[0].timestamp - from > GAP_THRESHOLD)
+        if (samples[0].timestamp - from > GAP_THRESHOLD &&
+            !this._overlapsSleep(from, samples[0].timestamp))
             gaps.push({start: from, end: samples[0].timestamp});
         for (let i = 1; i < samples.length; i++) {
             const dt = samples[i].timestamp - samples[i - 1].timestamp;
@@ -735,7 +753,7 @@ class PowerMonitorIndicator extends PanelMenu.Button {
         cr.stroke();
 
         this._drawTimeAxis(cr, margin, gw, gh, from, seconds);
-        this._drawSleepRegions(cr, margin, gw, gh, from, seconds);
+        const bSec = bucketSeconds(seconds);
         this._drawNoDataRegions(cr, margin, gw, gh, from, seconds, samples);
 
         // Draw bars
@@ -757,6 +775,8 @@ class PowerMonitorIndicator extends PanelMenu.Button {
             cr.rectangle(x, y, barWidth, barH);
             cr.fill();
         }
+
+        this._drawSleepRegions(cr, margin, gw, gh, from, seconds, bSec);
 
         // Bottom axis
         cr.setSourceRGBA(...COL_AXIS);

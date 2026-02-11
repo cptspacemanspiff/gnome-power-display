@@ -37,7 +37,8 @@ case "${1:-install}" in
                     # Start daemon if built
                     if [ -x "'"$DAEMON_BIN"'" ]; then
                         "'"$DAEMON_BIN"'" -verbose &
-                        echo "Daemon started."
+                        DAEMON_PID=$!
+                        echo "Daemon started (PID $DAEMON_PID)."
                     else
                         echo "Daemon not built. Run: bazel build //cmd/power-monitor-daemon"
                     fi
@@ -46,6 +47,11 @@ case "${1:-install}" in
                 sleep 1
             done
             wait $SHELL_PID
+            # Kill daemon when gnome-shell exits
+            if [ -n "$DAEMON_PID" ]; then
+                kill $DAEMON_PID 2>/dev/null
+                wait $DAEMON_PID 2>/dev/null
+            fi
         '
         ;;
     schemas)

@@ -5,7 +5,7 @@ Before=shutdown.target reboot.target halt.target
 
 [Service]
 Type=oneshot
-ExecStart=/bin/sh -c 'echo "{\"ts\":$(date +%%s),\"action\":\"pre\",\"what\":\"shutdown\",\"sleep_action\":\"\"}" >> /var/lib/power-monitor/state-log.jsonl'
+ExecStart=/usr/lib/systemd/system-sleep/power-monitor-sleep-hook pre shutdown
 
 [Install]
 WantedBy=shutdown.target reboot.target halt.target

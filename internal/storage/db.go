@@ -319,9 +319,9 @@ func (d *DB) PowerStateEventsInRange(from, to int64) ([]collector.PowerStateEven
 // and the new power_state_events table, unified into SleepEvent format.
 func (d *DB) SleepEventsInRange(from, to int64) ([]collector.SleepEvent, error) {
 	rows, err := d.db.Query(
-		`SELECT sleep_time, wake_time, type FROM sleep_events WHERE sleep_time >= ? AND sleep_time <= ?
+		`SELECT sleep_time, wake_time, type FROM sleep_events WHERE wake_time >= ? AND sleep_time <= ?
 		 UNION ALL
-		 SELECT start_time, end_time, type FROM power_state_events WHERE start_time >= ? AND start_time <= ?
+		 SELECT start_time, end_time, type FROM power_state_events WHERE end_time >= ? AND start_time <= ?
 		 ORDER BY 1`,
 		from, to, from, to,
 	)
