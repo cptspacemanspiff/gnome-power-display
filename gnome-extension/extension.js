@@ -424,6 +424,16 @@ class PowerMonitorIndicator extends PanelMenu.Button {
         return false;
     }
 
+    // Check if a time range overlaps with any sleep event.
+    _overlapsSleep(start, end) {
+        if (!this._sleepData) return false;
+        for (const evt of this._sleepData) {
+            if (start < evt.wake_time && end > evt.sleep_time)
+                return true;
+        }
+        return false;
+    }
+
     _drawBackground(cr, width, height) {
         cr.setSourceRGBA(...COL_BG);
         cr.rectangle(0, 0, width, height);
@@ -468,7 +478,7 @@ class PowerMonitorIndicator extends PanelMenu.Button {
             gaps.push({start: from, end: samples[0].timestamp});
         for (let i = 1; i < samples.length; i++) {
             const dt = samples[i].timestamp - samples[i - 1].timestamp;
-            if (dt > GAP_THRESHOLD && !this._isSleeping(samples[i - 1].timestamp))
+            if (dt > GAP_THRESHOLD && !this._overlapsSleep(samples[i - 1].timestamp, samples[i].timestamp))
                 gaps.push({start: samples[i - 1].timestamp, end: samples[i].timestamp});
         }
         for (const gap of gaps) {
@@ -617,7 +627,8 @@ class PowerMonitorIndicator extends PanelMenu.Button {
             const barH = 4;
             for (const seg of segments) {
                 for (let i = 1; i < seg.length; i++) {
-                    if (seg[i - 1].status === 'Charging' || seg[i - 1].status === 'Full') {
+                    if ((seg[i - 1].status === 'Charging' || seg[i - 1].status === 'Full') &&
+                        !this._overlapsSleep(seg[i - 1].timestamp, seg[i].timestamp)) {
                         const x1 = margin.left + ((seg[i - 1].timestamp - from) / seconds) * gw;
                         const x2 = margin.left + ((seg[i].timestamp - from) / seconds) * gw;
                         cr.setSourceRGBA(...COL_GREEN_CHG);

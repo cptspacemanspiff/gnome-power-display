@@ -38,10 +38,31 @@ func CollectBattery() (*BatterySample, error) {
 
 	// If power_now isn't reported, compute from voltage * current.
 	if s.PowerUW == 0 && s.VoltageUV > 0 && s.CurrentUA > 0 {
-		s.PowerUW = s.VoltageUV * s.CurrentUA / 1000000
+		s.PowerUW = (s.VoltageUV * s.CurrentUA) / 1000000
+	}
+
+	// Some firmware reports "Discharging" at full capacity while on AC power.
+	// Detect this and correct to "Full".
+	if s.Status == "Discharging" && s.CapacityPct >= 100 && isACOnline() {
+		s.Status = "Full"
 	}
 
 	return s, nil
+}
+
+// isACOnline checks if any AC adapter is online.
+func isACOnline() bool {
+	matches, err := filepath.Glob("/sys/class/power_supply/AC*/online")
+	if err != nil {
+		return false
+	}
+	for _, path := range matches {
+		data, err := os.ReadFile(path)
+		if err == nil && strings.TrimSpace(string(data)) == "1" {
+			return true
+		}
+	}
+	return false
 }
 
 func parseUevent(data string) map[string]string {
