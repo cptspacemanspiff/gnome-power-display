@@ -487,10 +487,9 @@ class PowerMonitorIndicator extends PanelMenu.Button {
     }
 
     // Find gaps in sample data and draw hatched "no data" regions
-    _drawNoDataRegions(cr, margin, gw, gh, from, rangeSeconds, samples) {
-        if (!samples || samples.length === 0) return;
+    _getNoDataGaps(samples, from) {
+        if (!samples || samples.length === 0) return [];
         const gaps = [];
-        // Gap at the start if first sample is late
         if (samples[0].timestamp - from > GAP_THRESHOLD &&
             !this._overlapsSleep(from, samples[0].timestamp))
             gaps.push({start: from, end: samples[0].timestamp});
@@ -499,6 +498,12 @@ class PowerMonitorIndicator extends PanelMenu.Button {
             if (dt > GAP_THRESHOLD && !this._overlapsSleep(samples[i - 1].timestamp, samples[i].timestamp))
                 gaps.push({start: samples[i - 1].timestamp, end: samples[i].timestamp});
         }
+        return gaps;
+    }
+
+    _drawNoDataRegions(cr, margin, gw, gh, from, rangeSeconds, samples) {
+        if (!samples || samples.length === 0) return;
+        const gaps = this._getNoDataGaps(samples, from);
         for (const gap of gaps) {
             const x1 = Math.max(margin.left, margin.left + ((gap.start - from) / rangeSeconds) * gw);
             const x2 = Math.min(margin.left + gw, margin.left + ((gap.end - from) / rangeSeconds) * gw);
@@ -755,14 +760,19 @@ class PowerMonitorIndicator extends PanelMenu.Button {
         this._drawTimeAxis(cr, margin, gw, gh, from, seconds);
         const bSec = bucketSeconds(seconds);
         this._drawNoDataRegions(cr, margin, gw, gh, from, seconds, samples);
+        this._drawSleepRegions(cr, margin, gw, gh, from, seconds, bSec);
 
-        // Draw bars
+        // Draw bars (skip buckets that overlap sleep or no-data regions)
+        const noDataGaps = this._getNoDataGaps(samples, from);
         const slotWidth = gw / nBuckets;
         const maxBarWidth = 12;
         const barWidth = Math.min(slotWidth * 0.75, maxBarWidth);
         for (let i = 0; i < nBuckets; i++) {
             const b = buckets[i];
             if (b.count === 0) continue;
+            const bucketEnd = b.start + bSec;
+            if (this._overlapsSleep(b.start, bucketEnd)) continue;
+            if (noDataGaps.some(g => b.start < g.end && bucketEnd > g.start)) continue;
             const avg = b.sumPower / b.count;
             const barH = (avg / maxScale) * gh;
             const x = margin.left + (i + 0.5) * slotWidth - barWidth / 2;
@@ -775,8 +785,6 @@ class PowerMonitorIndicator extends PanelMenu.Button {
             cr.rectangle(x, y, barWidth, barH);
             cr.fill();
         }
-
-        this._drawSleepRegions(cr, margin, gw, gh, from, seconds, bSec);
 
         // Bottom axis
         cr.setSourceRGBA(...COL_AXIS);
