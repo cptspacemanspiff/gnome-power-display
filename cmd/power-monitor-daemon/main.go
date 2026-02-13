@@ -134,11 +134,14 @@ func main() {
 	// Import any power state events from the systemd hook state log.
 	importStateLog(store, sleepLog)
 
-	// Start sleep monitor (debug logging only; state log is authoritative).
+	// Start sleep monitor; its wake channel triggers state log re-reads
+	// (catches short sleeps that don't produce a wall-clock jump).
 	sleepMon, err := collector.NewSleepMonitor(sleepLog)
+	var wakeCh <-chan struct{}
 	if err != nil {
 		logger.Warn("sleep monitor unavailable", "err", err)
 	} else {
+		wakeCh = sleepMon.Wake()
 		defer sleepMon.Close()
 	}
 
@@ -244,6 +247,10 @@ func main() {
 			} else {
 				processLog.Debug("collect failed", "err", err)
 			}
+		case <-wakeCh:
+			logger.Info("wake signal received, re-reading state log")
+			importStateLog(store, sleepLog)
+			lastTick = time.Now().Round(0)
 		case <-sigCh:
 			logger.Info("shutting down")
 			return

@@ -6,12 +6,14 @@ import (
 	"github.com/godbus/dbus/v5"
 )
 
-// SleepMonitor listens for systemd-logind PrepareForSleep/PrepareForShutdown signals
-// for debug logging. The file-based state log is the authoritative source of power
-// state events.
+// SleepMonitor listens for systemd-logind PrepareForSleep/PrepareForShutdown signals.
+// The file-based state log is the authoritative source of power state events, but this
+// monitor provides a wake notification channel so the daemon can re-read the state log
+// immediately on wake (catching short sleeps that don't trigger a wall-clock jump).
 type SleepMonitor struct {
 	conn *dbus.Conn
 	done chan struct{}
+	wake chan struct{}
 	log  *slog.Logger
 }
 
@@ -35,10 +37,16 @@ func NewSleepMonitor(logger *slog.Logger) (*SleepMonitor, error) {
 	m := &SleepMonitor{
 		conn: conn,
 		done: make(chan struct{}),
+		wake: make(chan struct{}, 1),
 		log:  logger,
 	}
 	go m.listen()
 	return m, nil
+}
+
+// Wake returns a channel that receives a value each time the system wakes from sleep.
+func (m *SleepMonitor) Wake() <-chan struct{} {
+	return m.wake
 }
 
 // Close stops the monitor.
@@ -72,6 +80,10 @@ func (m *SleepMonitor) listen() {
 					m.log.Info("system going to sleep")
 				} else {
 					m.log.Info("system woke up")
+					select {
+					case m.wake <- struct{}{}:
+					default:
+					}
 				}
 			}
 		case <-m.done:
