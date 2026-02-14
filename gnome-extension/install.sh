@@ -58,14 +58,24 @@ case "${1:-install}" in
         glib-compile-schemas "$SRC_DIR/schemas"
         echo "Schemas compiled."
         ;;
+    uninstall)
+        gnome-extensions disable "$EXT_UUID" 2>/dev/null && echo "Extension disabled." || true
+        if [ -L "$EXT_DIR" ] || [ -e "$EXT_DIR" ]; then
+            rm -rf "$EXT_DIR"
+            echo "Removed $EXT_DIR"
+        else
+            echo "Extension not installed."
+        fi
+        ;;
     log)
         journalctl -f /usr/bin/gnome-shell -o cat | grep -i --line-buffered power
         ;;
     *)
-        echo "Usage: $0 {install|nested|schemas|log}"
-        echo "  install - Symlink extension to GNOME extensions dir (run once)"
-        echo "  nested  - Launch nested GNOME Shell with extension auto-enabled"
-        echo "  schemas - Recompile gsettings schemas"
-        echo "  log     - Tail GNOME Shell logs filtered for this extension"
+        echo "Usage: $0 {install|uninstall|nested|schemas|log}"
+        echo "  install   - Symlink extension to GNOME extensions dir (run once)"
+        echo "  uninstall - Disable and remove the extension"
+        echo "  nested    - Launch nested GNOME Shell with extension auto-enabled"
+        echo "  schemas   - Recompile gsettings schemas"
+        echo "  log       - Tail GNOME Shell logs filtered for this extension"
         ;;
 esac
