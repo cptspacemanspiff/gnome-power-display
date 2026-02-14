@@ -1,0 +1,12 @@
+[storage]
+db_path = "/var/lib/power-monitor/data.db"
+state_log_path = "/var/lib/power-monitor/state-log.jsonl"
+
+[collection]
+interval_seconds = 5
+top_processes = 10
+wall_clock_jump_threshold_seconds = 15
+
+[cleanup]
+retention_days = 30
+interval_hours = 24

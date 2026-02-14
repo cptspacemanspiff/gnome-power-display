@@ -28,6 +28,10 @@ contents:
   - src: ./packaging/org.gnome.PowerMonitor.conf
     dst: /etc/dbus-1/system.d/org.gnome.PowerMonitor.conf
 
+  - src: ./packaging/config.toml
+    dst: /etc/power-monitor/config.toml
+    type: config|noreplace
+
 scripts:
   postinstall: ./packaging/postinstall-daemon.sh
   preremove: ./packaging/preremove-daemon.sh

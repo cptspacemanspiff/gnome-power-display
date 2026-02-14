@@ -11,14 +11,14 @@ import (
 )
 
 const (
-	busName   = "org.gnome.PowerMonitor"
-	objPath   = "/org/gnome/PowerMonitor"
-	ifaceName = "org.gnome.PowerMonitor"
+	BusName   = "org.gnome.PowerMonitor"
+	ObjPath   = "/org/gnome/PowerMonitor"
+	IfaceName = "org.gnome.PowerMonitor"
 )
 
 const introspectXML = `
 <node>
-  <interface name="` + ifaceName + `">
+  <interface name="` + IfaceName + `">
     <method name="GetCurrentStats">
       <arg direction="out" type="s" name="json"/>
     </method>
@@ -58,15 +58,15 @@ func (s *Service) Export() (*godbus.Conn, error) {
 		return nil, fmt.Errorf("connect system bus: %w", err)
 	}
 
-	conn.Export(s, objPath, ifaceName)
-	conn.Export(introspect.Introspectable(introspectXML), objPath, "org.freedesktop.DBus.Introspectable")
+	conn.Export(s, ObjPath, IfaceName)
+	conn.Export(introspect.Introspectable(introspectXML), ObjPath, "org.freedesktop.DBus.Introspectable")
 
-	reply, err := conn.RequestName(busName, godbus.NameFlagDoNotQueue)
+	reply, err := conn.RequestName(BusName, godbus.NameFlagDoNotQueue)
 	if err != nil {
 		return nil, fmt.Errorf("request name: %w", err)
 	}
 	if reply != godbus.RequestNameReplyPrimaryOwner {
-		return nil, fmt.Errorf("name %s already taken", busName)
+		return nil, fmt.Errorf("name %s already taken", BusName)
 	}
 
 	return conn, nil

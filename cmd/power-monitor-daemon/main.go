@@ -143,7 +143,7 @@ func main() {
 		os.Exit(1)
 	}
 	defer conn.Close()
-	logger.Info("D-Bus service registered", "name", "org.gnome.PowerMonitor")
+	logger.Info("D-Bus service registered", "name", dbussvc.BusName)
 
 	// Import any power state events from the systemd hook state log.
 	importStateLog(store, sleepLog, cfg.Storage.StateLogPath)
