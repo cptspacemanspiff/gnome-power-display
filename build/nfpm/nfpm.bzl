@@ -1,11 +1,11 @@
 """Bazel rule to download and run nFPM for packaging."""
 
-_NFPM_VERSION = "2.41.1"
+_NFPM_VERSION = "2.45.0"
 
 _NFPM_PLATFORMS = {
     "linux_amd64": struct(
         url = "https://github.com/goreleaser/nfpm/releases/download/v{version}/nfpm_{version}_Linux_x86_64.tar.gz",
-        sha256 = "b3cf95aa6dabed836d09ad7f0c190a13c74c5b1304db60846f0f702ee407f430",
+        sha256 = "940f0c3ba8e2c9cc5669026a1c0c20453403b9c32ea4c66fd25426bcbe605a84",
     ),
     "linux_arm64": struct(
         url = "https://github.com/goreleaser/nfpm/releases/download/v{version}/nfpm_{version}_Linux_arm64.tar.gz",
