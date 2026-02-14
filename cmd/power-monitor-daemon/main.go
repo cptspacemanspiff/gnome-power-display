@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/cptspacemanspiff/gnome-power-display/internal/collector"
+	"github.com/cptspacemanspiff/gnome-power-display/internal/config"
 	dbussvc "github.com/cptspacemanspiff/gnome-power-display/internal/dbus"
 	"github.com/cptspacemanspiff/gnome-power-display/internal/storage"
 )
@@ -70,6 +71,7 @@ func main() {
 	verbose := flag.Bool("verbose", false, "enable all verbose logging (equivalent to -log=all)")
 	logFlag := flag.String("log", "", "comma-separated log topics: battery,backlight,process,sleep (or 'all')")
 	resetDB := flag.Bool("reset-db", false, "delete the database and start fresh")
+	configPath := flag.String("config", "/etc/power-monitor/config.toml", "path to config file")
 	flag.Parse()
 
 	topics := make(map[string]bool)
@@ -88,12 +90,26 @@ func main() {
 	}
 	logger := slog.New(handler)
 
+	// Load config.
+	cfg, err := config.Load(*configPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			cfg = config.DefaultConfig()
+			logger.Info("config file not found, using defaults", "path", *configPath)
+		} else {
+			logger.Error("load config", "path", *configPath, "err", err)
+			os.Exit(1)
+		}
+	} else {
+		logger.Info("loaded config", "path", *configPath)
+	}
+
 	batteryLog := logger.With("topic", "battery")
 	backlightLog := logger.With("topic", "backlight")
 	processLog := logger.With("topic", "process")
 	sleepLog := logger.With("topic", "sleep")
 
-	dbPath := "/var/lib/power-monitor/data.db"
+	dbPath := cfg.Storage.DBPath
 	if err := os.MkdirAll(filepath.Dir(dbPath), 0755); err != nil {
 		logger.Error("create data dir", "err", err)
 		os.Exit(1)
@@ -117,6 +133,9 @@ func main() {
 	}
 	defer store.Close()
 
+	// Run cleanup on startup.
+	runCleanup(store, cfg.Cleanup.RetentionDays, logger)
+
 	svc := dbussvc.NewService(store)
 	conn, err := svc.Export()
 	if err != nil {
@@ -127,7 +146,7 @@ func main() {
 	logger.Info("D-Bus service registered", "name", "org.gnome.PowerMonitor")
 
 	// Import any power state events from the systemd hook state log.
-	importStateLog(store, sleepLog)
+	importStateLog(store, sleepLog, cfg.Storage.StateLogPath)
 
 	// Start sleep monitor; its wake channel triggers state log re-reads
 	// (catches short sleeps that don't produce a wall-clock jump).
@@ -141,24 +160,30 @@ func main() {
 	}
 
 	// Start process collector.
-	procCollector := collector.NewProcessCollector(10)
+	procCollector := collector.NewProcessCollector(cfg.Collection.TopProcesses)
 
 	// Collect battery, backlight, and process data on a ticker.
-	ticker := time.NewTicker(5 * time.Second)
+	collectInterval := time.Duration(cfg.Collection.IntervalSeconds) * time.Second
+	ticker := time.NewTicker(collectInterval)
 	defer ticker.Stop()
+
+	// Start cleanup ticker.
+	cleanupTicker := time.NewTicker(time.Duration(cfg.Cleanup.IntervalHours) * time.Hour)
+	defer cleanupTicker.Stop()
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
-	logger.Info("power-monitor-daemon started, collecting every 5s")
+	jumpThreshold := time.Duration(cfg.Collection.WallClockJumpThresholdSeconds) * time.Second
+	logger.Info("power-monitor-daemon started", "interval", collectInterval)
 	lastTick := time.Now().Round(0) // Strip monotonic so Sub uses wall clock across suspend
 	for {
 		select {
 		case <-ticker.C:
 			now := time.Now().Round(0)
-			if now.Sub(lastTick) > 15*time.Second {
+			if now.Sub(lastTick) > jumpThreshold {
 				logger.Info("wall-clock jump detected, re-reading state log", "gap_secs", int(now.Sub(lastTick).Seconds()))
-				importStateLog(store, sleepLog)
+				importStateLog(store, sleepLog, cfg.Storage.StateLogPath)
 			}
 			lastTick = now
 			if sample, err := collector.CollectBattery(); err == nil {
@@ -244,8 +269,10 @@ func main() {
 			}
 		case <-wakeCh:
 			logger.Info("wake signal received, re-reading state log")
-			importStateLog(store, sleepLog)
+			importStateLog(store, sleepLog, cfg.Storage.StateLogPath)
 			lastTick = time.Now().Round(0)
+		case <-cleanupTicker.C:
+			runCleanup(store, cfg.Cleanup.RetentionDays, logger)
 		case <-sigCh:
 			logger.Info("shutting down")
 			return
@@ -253,8 +280,18 @@ func main() {
 	}
 }
 
-func importStateLog(store *storage.DB, logger *slog.Logger) {
-	events := collector.ReadAndConsumeStateLog(logger, time.Now())
+func runCleanup(store *storage.DB, retentionDays int, logger *slog.Logger) {
+	before := time.Now().AddDate(0, 0, -retentionDays).Unix()
+	deleted, err := store.DeleteOlderThan(before)
+	if err != nil {
+		logger.Error("cleanup failed", "err", err)
+	} else if deleted > 0 {
+		logger.Info("cleanup completed", "deleted_rows", deleted, "retention_days", retentionDays)
+	}
+}
+
+func importStateLog(store *storage.DB, logger *slog.Logger, stateLogPath string) {
+	events := collector.ReadAndConsumeStateLog(logger, time.Now(), stateLogPath)
 	if len(events) == 0 {
 		logger.Debug("no new power state events in state log")
 		return

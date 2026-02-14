@@ -8,8 +8,6 @@ import (
 	"time"
 )
 
-const stateLogPath = "/var/lib/power-monitor/state-log.jsonl"
-
 // stateLogEntry is a single line from the state log file written by the systemd hooks.
 type stateLogEntry struct {
 	Ts          int64  `json:"ts"`
@@ -21,7 +19,7 @@ type stateLogEntry struct {
 // ReadAndConsumeStateLog atomically reads the state log file and removes it,
 // returning reconstructed PowerStateEvents. now is used as the end time for
 // events that have no "post" entry (daemon started after hibernate/shutdown).
-func ReadAndConsumeStateLog(logger *slog.Logger, now time.Time) []PowerStateEvent {
+func ReadAndConsumeStateLog(logger *slog.Logger, now time.Time, stateLogPath string) []PowerStateEvent {
 	processingPath := stateLogPath + ".processing"
 
 	// Atomic rename so the hook creates a fresh file for new entries.

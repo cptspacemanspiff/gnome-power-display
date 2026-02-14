@@ -7,6 +7,7 @@ go_binary(
     visibility = ["//visibility:public"],
     deps = [
         "//internal/collector",
+        "//internal/config",
         "//internal/dbus",
         "//internal/storage",
     ],
