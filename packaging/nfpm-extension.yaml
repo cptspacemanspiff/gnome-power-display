@@ -1,0 +1,49 @@
+name: power-monitor-gnome-extension
+arch: amd64
+platform: linux
+version: v${VERSION}
+maintainer: Nicholas Long
+description: >
+  GNOME Shell extension for visualizing power monitoring data.
+  Shows battery level, power draw graphs, sleep/hibernate regions,
+  and brightness tracking in the GNOME Shell panel.
+vendor: gnome-power-display
+homepage: https://github.com/cptspacemanspiff/gnome-power-display
+license: GPL-3.0
+
+depends:
+  - power-monitor-daemon = ${VERSION}
+
+contents:
+  - src: ./gnome-extension/extension.js
+    dst: /usr/share/gnome-shell/extensions/power-monitor@gnome-power-display/extension.js
+
+  - src: ./gnome-extension/prefs.js
+    dst: /usr/share/gnome-shell/extensions/power-monitor@gnome-power-display/prefs.js
+
+  - src: ./gnome-extension/stylesheet.css
+    dst: /usr/share/gnome-shell/extensions/power-monitor@gnome-power-display/stylesheet.css
+
+  - src: ./gnome-extension/metadata.json
+    dst: /usr/share/gnome-shell/extensions/power-monitor@gnome-power-display/metadata.json
+
+  - src: ./gnome-extension/graphs.js
+    dst: /usr/share/gnome-shell/extensions/power-monitor@gnome-power-display/graphs.js
+
+  - src: ./gnome-extension/graphUtils.js
+    dst: /usr/share/gnome-shell/extensions/power-monitor@gnome-power-display/graphUtils.js
+
+  - src: ./gnome-extension/dragHandler.js
+    dst: /usr/share/gnome-shell/extensions/power-monitor@gnome-power-display/dragHandler.js
+
+  - src: ./gnome-extension/schemas/org.gnome.shell.extensions.power-monitor.gschema.xml
+    dst: /usr/share/glib-2.0/schemas/org.gnome.shell.extensions.power-monitor.gschema.xml
+
+scripts:
+  postinstall: ./packaging/postinstall.sh
+  postremove: ./packaging/postremove.sh
+
+rpm:
+  group: Applications/System
+
+deb: {}

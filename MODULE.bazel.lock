@@ -208,6 +208,19 @@
   },
   "selectedYankedVersions": {},
   "moduleExtensions": {
+    "//build/nfpm:extensions.bzl%nfpm": {
+      "general": {
+        "bzlTransitiveDigest": "q4CrxG6fqasEfFUTQZwDhG5Au6WKt5USqVnx1OyRP+Q=",
+        "usagesDigest": "Ru4xtCTWbOEhtiwh7Cs5+NAY3VWCkVzOZohCOmAkpFg=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {
+          "nfpm_toolchain": {
+            "repoRuleId": "@@//build/nfpm:nfpm.bzl%nfpm_toolchain_repo",
+            "attributes": {}
+          }
+        }
+      }
+    },
     "@@rules_kotlin+//src/main/starlark/core/repositories:bzlmod_setup.bzl%rules_kotlin_extensions": {
       "general": {
         "bzlTransitiveDigest": "ABI1D/sbS1ovwaW/kHDoj8nnXjQ0oKU9fzmzEG4iT8o=",

@@ -1,0 +1,10 @@
+filegroup(
+    name = "extension-files",
+    srcs = glob([
+        "*.js",
+        "*.css",
+        "*.json",
+        "schemas/*.xml",
+    ]),
+    visibility = ["//visibility:public"],
+)

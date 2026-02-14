@@ -8,6 +8,9 @@ bazel_dep(
     version = "0.43.0",
 )
 
+nfpm = use_extension("//build/nfpm:extensions.bzl", "nfpm")
+use_repo(nfpm, "nfpm_toolchain")
+
 go_deps = use_extension("@gazelle//:extensions.bzl", "go_deps")
 go_deps.from_file(go_mod = "//:go.mod")
 use_repo(

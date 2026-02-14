@@ -1,12 +1,12 @@
 [Unit]
 Description=GNOME Power Monitor Daemon
-After=graphical-session.target
+After=multi-user.target
 
 [Service]
 Type=simple
-ExecStart=%h/dev/gnome-power-display/bazel-bin/cmd/power-monitor-daemon/power-monitor-daemon_/power-monitor-daemon -verbose
+ExecStart=/usr/bin/power-monitor-daemon
 Restart=on-failure
 RestartSec=5
 
 [Install]
-WantedBy=default.target
+WantedBy=multi-user.target

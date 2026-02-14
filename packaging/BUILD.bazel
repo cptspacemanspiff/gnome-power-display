@@ -1,0 +1,78 @@
+load("//build/nfpm:nfpm.bzl", "nfpm_pkg")
+
+filegroup(
+    name = "service-files",
+    srcs = [
+        "power-monitor-daemon.service",
+        "power-monitor-shutdown.service",
+        "power-monitor-sleep-hook",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "scripts",
+    srcs = [
+        "postinstall.sh",
+        "postremove.sh",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+# Daemon package (binary + systemd service)
+
+nfpm_pkg(
+    name = "daemon-rpm",
+    config = "nfpm-daemon.yaml",
+    package_name = "power-monitor-daemon",
+    packager = "rpm",
+    srcs = [
+        "//cmd/power-monitor-daemon",
+        ":service-files",
+    ],
+    file_map = {
+        "power-monitor-daemon_/power-monitor-daemon": "build/power-monitor-daemon",
+    },
+    version = "0.1.0",
+)
+
+nfpm_pkg(
+    name = "daemon-deb",
+    config = "nfpm-daemon.yaml",
+    package_name = "power-monitor-daemon",
+    packager = "deb",
+    srcs = [
+        "//cmd/power-monitor-daemon",
+        ":service-files",
+    ],
+    file_map = {
+        "power-monitor-daemon_/power-monitor-daemon": "build/power-monitor-daemon",
+    },
+    version = "0.1.0",
+)
+
+# GNOME extension package (depends on daemon)
+
+nfpm_pkg(
+    name = "extension-rpm",
+    config = "nfpm-extension.yaml",
+    package_name = "power-monitor-gnome-extension",
+    packager = "rpm",
+    srcs = [
+        "//gnome-extension:extension-files",
+        ":scripts",
+    ],
+    version = "0.1.0",
+)
+
+nfpm_pkg(
+    name = "extension-deb",
+    config = "nfpm-extension.yaml",
+    package_name = "power-monitor-gnome-extension",
+    packager = "deb",
+    srcs = [
+        "//gnome-extension:extension-files",
+        ":scripts",
+    ],
+    version = "0.1.0",
+)

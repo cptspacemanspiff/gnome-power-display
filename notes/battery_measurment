@@ -1,0 +1,40 @@
+
+  Hardware Chain
+
+  Battery fuel gauge (on battery PCB)
+    → SMBus →
+  Chrome EC (embedded controller, addr 0x08 on i2c-17)
+    → ACPI →
+  Linux kernel (acpi/battery.c)
+    → sysfs →
+  /sys/class/power_supply/BAT1/
+
+  What We Found
+
+  Fuel gauge resolution: 1 mAh (1000 uAh) steps. At ~25W draw (~1.7A), each tick occurs
+  roughly every 2 seconds. The tick timing has jitter (1-5 seconds observed) due to
+  polling/aliasing between the fuel gauge, EC, and kernel layers.
+
+  No direct fuel gauge access: The fuel gauge isn't exposed on the SMBus (0x0B absent). The
+  EC owns the battery interface. SMBus devices found at 0x08 (EC), 0x30/34/35 (sensors),
+  0x36/37 (dummy driver reserved), 0x44, 0x50/52 (EEPROMs).
+
+  Voltage: Stable within ~70mV (0.5%) at steady state. Changes slowly with discharge curve.
+  Safe to use a single reading per measurement window.
+
+  current_now: Averaged by the fuel gauge firmware. Useful for rough real-time display but
+  subject to the same EC polling bottleneck.
+
+  RAPL comparison: psys updates at millisecond resolution and closely matches
+  battery-reported power (~25-30W). Far better for real-time display. psys - package gives
+  non-CPU/GPU power (memory, WiFi, etc.) at ~10W observed.
+
+  Practical Implications for Power Monitor
+
+  - Short-term power (<10s): Use RAPL psys. Much higher resolution and update rate.
+  - Long-term energy (minutes+): Use charge_now delta × voltage_now. Accurate via coulomb
+  counting, just coarse.
+  - Per-tick power from charge_now: Unreliable due to 1 mAh quantization and timing jitter.
+  Average over 10+ ticks (~20s) minimum.
+  - Possible improvement: Chrome EC (cros_ec / ectool) may provide higher-rate battery
+  register access, bypassing ACPI caching. Untested.

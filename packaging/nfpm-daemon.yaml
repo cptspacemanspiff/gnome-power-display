@@ -1,0 +1,31 @@
+name: power-monitor-daemon
+arch: amd64
+platform: linux
+version: v${VERSION}
+maintainer: Nicholas Long
+description: >
+  Power monitoring daemon that collects battery, backlight, and sleep data
+  into SQLite and exposes it over D-Bus.
+vendor: gnome-power-display
+homepage: https://github.com/cptspacemanspiff/gnome-power-display
+license: GPL-3.0
+
+contents:
+  - src: ./build/power-monitor-daemon
+    dst: /usr/bin/power-monitor-daemon
+
+  - src: ./packaging/power-monitor-daemon.service
+    dst: /usr/lib/systemd/system/power-monitor-daemon.service
+
+  - src: ./packaging/power-monitor-shutdown.service
+    dst: /usr/lib/systemd/system/power-monitor-shutdown.service
+
+  - src: ./packaging/power-monitor-sleep-hook
+    dst: /usr/lib/systemd/system-sleep/power-monitor-sleep-hook
+    file_info:
+      mode: 0755
+
+rpm:
+  group: Applications/System
+
+deb: {}
