@@ -6,6 +6,9 @@ filegroup(
         "power-monitor-daemon.service",
         "power-monitor-shutdown.service",
         "power-monitor-sleep-hook",
+        "org.gnome.PowerMonitor.conf",
+        "postinstall-daemon.sh",
+        "preremove-daemon.sh",
     ],
     visibility = ["//visibility:public"],
 )

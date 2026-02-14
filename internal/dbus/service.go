@@ -51,11 +51,11 @@ func NewService(store *storage.DB) *Service {
 	return &Service{store: store}
 }
 
-// Export registers the service on the session bus.
+// Export registers the service on the system bus.
 func (s *Service) Export() (*godbus.Conn, error) {
-	conn, err := godbus.SessionBus()
+	conn, err := godbus.SystemBus()
 	if err != nil {
-		return nil, fmt.Errorf("connect session bus: %w", err)
+		return nil, fmt.Errorf("connect system bus: %w", err)
 	}
 
 	conn.Export(s, objPath, ifaceName)

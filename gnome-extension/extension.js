@@ -95,7 +95,7 @@ class PowerMonitorIndicator extends PanelMenu.Button {
 
     _createProxy() {
         try {
-            this._proxy = new PowerMonitorProxy(Gio.DBus.session, DBUS_NAME, DBUS_PATH);
+            this._proxy = new PowerMonitorProxy(Gio.DBus.system, DBUS_NAME, DBUS_PATH);
         } catch (e) {
             log(`PowerMonitor: proxy error: ${e.message}`);
         }

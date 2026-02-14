@@ -25,6 +25,13 @@ contents:
     file_info:
       mode: 0755
 
+  - src: ./packaging/org.gnome.PowerMonitor.conf
+    dst: /etc/dbus-1/system.d/org.gnome.PowerMonitor.conf
+
+scripts:
+  postinstall: ./packaging/postinstall-daemon.sh
+  preremove: ./packaging/preremove-daemon.sh
+
 rpm:
   group: Applications/System
 

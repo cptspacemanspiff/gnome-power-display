@@ -93,12 +93,7 @@ func main() {
 	processLog := logger.With("topic", "process")
 	sleepLog := logger.With("topic", "sleep")
 
-	dataDir := os.Getenv("XDG_DATA_HOME")
-	if dataDir == "" {
-		home, _ := os.UserHomeDir()
-		dataDir = filepath.Join(home, ".local", "share")
-	}
-	dbPath := filepath.Join(dataDir, "power-monitor", "data.db")
+	dbPath := "/var/lib/power-monitor/data.db"
 	if err := os.MkdirAll(filepath.Dir(dbPath), 0755); err != nil {
 		logger.Error("create data dir", "err", err)
 		os.Exit(1)
