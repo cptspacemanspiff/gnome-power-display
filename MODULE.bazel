@@ -6,7 +6,6 @@ bazel_dep(
     name = "gazelle",
     version = "0.47.0",
 )
-
 bazel_dep(name = "glfw", version = "3.4.0.bcr.1")
 
 nfpm = use_extension("//build/nfpm:extensions.bzl", "nfpm")
@@ -17,9 +16,9 @@ use_repo(nfpm, "nfpm_toolchain")
 go_deps = use_extension("@gazelle//:extensions.bzl", "go_deps")
 go_deps.from_file(go_mod = "//:go.mod")
 go_deps.module_override(
-    path = "github.com/go-gl/glfw/v3.3/glfw",
-    patches = ["//third_party/patches:glfw_inputs.patch"],
     patch_strip = 1,
+    patches = ["//third_party/patches:glfw_inputs.patch"],
+    path = "github.com/go-gl/glfw/v3.3/glfw",
 )
 use_repo(
     go_deps,
@@ -27,4 +26,5 @@ use_repo(
     "com_github_godbus_dbus_v5",
     "com_github_mattn_go_sqlite3",
     "io_fyne_fyne_v2",
+    "io_fyne_x_fyne",
 )

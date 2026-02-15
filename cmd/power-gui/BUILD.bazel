@@ -14,6 +14,7 @@ go_library(
         "graphs.go",
         "main.go",
         "stats.go",
+        "theme.go",
         "timerange.go",
     ],
     importpath = "github.com/cptspacemanspiff/gnome-power-display/cmd/power-gui",
@@ -26,7 +27,7 @@ go_library(
         "@io_fyne_fyne_v2//canvas",
         "@io_fyne_fyne_v2//container",
         "@io_fyne_fyne_v2//layout",
-        "@io_fyne_fyne_v2//theme",
         "@io_fyne_fyne_v2//widget",
+        "@io_fyne_x_fyne//theme",
     ],
 )

@@ -36,7 +36,7 @@ func newStatsBar() *statsBar {
 	statusTitle := newLabelText("Status")
 	brightTitle := newLabelText("Brightness")
 
-	bg := canvas.NewRectangle(color.NRGBA{R: 30, G: 30, B: 30, A: 230})
+	bg := canvas.NewRectangle(accentBgColor())
 
 	row := container.New(layout.NewHBoxLayout(),
 		container.NewVBox(powerTitle, s.powerLabel),
