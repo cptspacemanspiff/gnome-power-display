@@ -23,6 +23,9 @@ func (d *DB) DeleteOlderThan(before int64) (int64, error) {
 		{"cpu_freq_samples", "timestamp"},
 	}
 
+	// Note: table/column names are from a hardcoded slice, not user input.
+	// fmt.Sprintf is used here because SQL placeholders (?) only work for values, not identifiers.
+	// This is safe because 'tables' is a compile-time constant slice.
 	for _, t := range tables {
 		res, err := tx.Exec(
 			fmt.Sprintf("DELETE FROM %s WHERE %s < ?", t.name, t.column),

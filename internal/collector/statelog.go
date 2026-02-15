@@ -36,6 +36,8 @@ func ReadAndConsumeStateLog(logger *slog.Logger, now time.Time, stateLogPath str
 		logger.Error("open processing file", "err", err)
 		return nil
 	}
+	defer f.Close()
+	defer os.Remove(processingPath)
 
 	var entries []stateLogEntry
 	scanner := bufio.NewScanner(f)
@@ -47,8 +49,6 @@ func ReadAndConsumeStateLog(logger *slog.Logger, now time.Time, stateLogPath str
 		}
 		entries = append(entries, e)
 	}
-	f.Close()
-	os.Remove(processingPath)
 
 	if len(entries) == 0 {
 		return nil

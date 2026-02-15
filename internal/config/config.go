@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/BurntSushi/toml"
@@ -56,6 +57,23 @@ func Load(path string) (*Config, error) {
 
 	if err := toml.Unmarshal(data, cfg); err != nil {
 		return nil, err
+	}
+
+	// Validate config values
+	if cfg.Collection.IntervalSeconds <= 0 {
+		return nil, fmt.Errorf("collection.interval_seconds must be positive, got %d", cfg.Collection.IntervalSeconds)
+	}
+	if cfg.Collection.TopProcesses < 0 {
+		return nil, fmt.Errorf("collection.top_processes must be non-negative, got %d", cfg.Collection.TopProcesses)
+	}
+	if cfg.Collection.WallClockJumpThresholdSeconds <= 0 {
+		return nil, fmt.Errorf("collection.wall_clock_jump_threshold_seconds must be positive, got %d", cfg.Collection.WallClockJumpThresholdSeconds)
+	}
+	if cfg.Cleanup.RetentionDays <= 0 {
+		return nil, fmt.Errorf("cleanup.retention_days must be positive, got %d", cfg.Cleanup.RetentionDays)
+	}
+	if cfg.Cleanup.IntervalHours <= 0 {
+		return nil, fmt.Errorf("cleanup.interval_hours must be positive, got %d", cfg.Cleanup.IntervalHours)
 	}
 
 	return cfg, nil

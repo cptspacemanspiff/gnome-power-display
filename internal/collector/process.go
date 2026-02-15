@@ -186,7 +186,7 @@ func (pc *ProcessCollector) Collect() ([]ProcessSample, []CPUFreqSample, *Proces
 	// Update state: replace prevTicks, prune dead pids from cmdline cache
 	pc.prevTicks = currentTicks
 	for pid := range pc.cmdlineCache {
-		if _, alive := currentTicks[pid]; !alive {
+		if _, exists := pc.prevTicks[pid]; !exists {
 			delete(pc.cmdlineCache, pid)
 		}
 	}

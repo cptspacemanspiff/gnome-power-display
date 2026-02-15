@@ -23,26 +23,91 @@ sudo bazel-bin/cmd/power-calibrate/power-calibrate_/power-calibrate
 ```
 cmd/power-monitor-daemon/     Daemon: collects data, exposes D-Bus service
 cmd/power-calibrate/          CLI tool: measures display power at brightness levels
-internal/collector/           Battery, backlight, sleep data collection from sysfs
-internal/storage/             SQLite storage (battery_samples, backlight_samples, sleep_events)
-internal/dbus/                D-Bus service (org.gnome.PowerMonitor)
+internal/collector/           Battery, backlight, process, CPU freq, sleep data collection
+internal/storage/             SQLite storage with WAL mode
+internal/dbus/                D-Bus service (org.gnome.PowerMonitor) on system bus
+internal/config/              TOML config loading with validation
 internal/calibration/         CPU pinning, brightness control, power sampling, latency measurement
 gnome-extension/              GNOME 45-49 Shell extension (panel button, graphs, zoom)
 ```
 
 ## Power Monitor Daemon
 
-Runs as a user service, collects battery and backlight data every 5 seconds into SQLite (`~/.local/share/power-monitor/data.db`), monitors sleep/wake via systemd-logind D-Bus signals (distinguishing suspend vs hibernate), and exposes data over session D-Bus at `org.gnome.PowerMonitor`.
+Runs as a system-wide systemd service (as root), collects battery, backlight, process CPU, and CPU frequency data every 5 seconds into SQLite (`/var/lib/power-monitor/data.db`), monitors sleep/wake via systemd-logind D-Bus signals, and exposes data over system D-Bus at `org.gnome.PowerMonitor`.
 
-D-Bus methods: `GetCurrentStats()`, `GetHistory(from, to)`, `GetSleepEvents(from, to)`.
+### Configuration
 
-Use `-verbose` flag to log every sample and collector errors.
+Default config path: `/etc/power-monitor/config.toml`
 
-### Sleep/Hibernate Detection
+```toml
+[storage]
+db_path = "/var/lib/power-monitor/data.db"
+state_log_path = "/var/lib/power-monitor/state-log.jsonl"
 
-The daemon listens for both `PrepareForSleep` and `PrepareForShutdown` D-Bus signals from systemd-logind. `PrepareForShutdown(true)` fires before hibernate but not before suspend, so when it precedes `PrepareForSleep(true)`, the event is tagged as `"hibernate"`. Otherwise it's `"suspend"`. Sleep events include a `type` field: `"suspend"`, `"hibernate"`, or `"unknown"`.
+[collection]
+interval_seconds = 5
+top_processes = 10
+wall_clock_jump_threshold_seconds = 15
+
+[cleanup]
+retention_days = 30
+interval_hours = 24
+```
+
+Config validation ensures all values are positive/non-negative. Invalid configs will cause startup failure with descriptive errors.
+
+### D-Bus Interface
+
+Service name: `org.gnome.PowerMonitor` (system bus)
+Object path: `/org/gnome/PowerMonitor`
+
+Methods:
+- `GetCurrentStats()` → JSON with latest battery and backlight samples
+- `GetHistory(from_epoch, to_epoch)` → JSON with battery and backlight samples in time range
+- `GetSleepEvents(from_epoch, to_epoch)` → JSON with sleep/hibernate/shutdown events
+- `GetProcessHistory(from_epoch, to_epoch)` → JSON with process CPU usage and CPU frequency samples
+
+All time range methods validate inputs (non-negative, from ≤ to, range ≤ 1 year) to prevent DoS attacks. Database errors are properly propagated to clients as D-Bus errors.
+
+### Command-line Flags
+
+- `-verbose`: Enable all verbose logging (equivalent to `-log=all`)
+- `-log=<topics>`: Comma-separated log topics: `battery`, `backlight`, `process`, `sleep`, or `all`
+- `-reset-db`: Delete the database and exit
+- `-config=<path>`: Path to config file (default: `/etc/power-monitor/config.toml`)
+
+### Sleep/Hibernate/Shutdown Detection
+
+The daemon uses a file-based state log (`/var/lib/power-monitor/state-log.jsonl`) written by systemd hook scripts that run on power state transitions. This is the authoritative source of power state events.
+
+**State Log Format**: Each line is a JSON object:
+```json
+{"ts": 1234567890, "action": "pre", "what": "suspend", "sleep_action": "suspend"}
+{"ts": 1234567920, "action": "post", "what": "suspend", "sleep_action": "suspend"}
+```
+
+**Event Reconstruction**: The daemon atomically reads and consumes the state log, reconstructing `PowerStateEvent` records with:
+- `type`: `"suspend"`, `"hibernate"`, `"suspend-then-hibernate"`, or `"shutdown"`
+- `start_time` and `end_time`: Unix timestamps
+- `suspend_secs` and `hibernate_secs`: Duration in each phase (0 if not applicable)
+
+**Wake Detection**: The daemon listens for `PrepareForSleep(false)` D-Bus signals from systemd-logind. When a wake signal is received, it immediately re-reads the state log to import new events. This catches short sleep cycles that don't produce a wall-clock jump. The wake channel uses a buffered size of 1 with non-blocking send; if multiple wakes occur before the main loop reads, subsequent signals are dropped (benign because the state log contains all events and one re-read captures everything).
+
+**Wall-Clock Jump Detection**: On each ticker cycle, the daemon checks if wall-clock time jumped by more than the configured threshold (default 15 seconds). If so, it re-reads the state log to catch events that occurred while the daemon wasn't running.
 
 Wall-clock time is used for sleep duration calculation (Go's monotonic clock stops during suspend — `time.Now().Round(0)` strips the monotonic component so `Sub` uses wall time).
+
+### Process and CPU Frequency Collection
+
+**Process Tracking**: Every collection cycle, the daemon reads `/proc/*/stat` to track per-process CPU usage (utime + stime ticks). It computes tick deltas from the previous cycle and stores the top N processes by CPU usage (default 10). Process cmdlines are cached and pruned when PIDs no longer exist in `prevTicks` to prevent memory leaks.
+
+**CPU Topology Detection**: On startup, the daemon detects P-cores vs E-cores by reading `/sys/devices/system/cpu/cpu*/cpufreq/base_frequency` (or `cpuinfo_max_freq` as fallback). Cores with the highest base frequency are classified as P-cores. This distinction is stored in process samples and CPU frequency samples.
+
+**CPU Frequency Sampling**: Each cycle, the daemon reads `/sys/devices/system/cpu/cpu*/cpufreq/scaling_cur_freq` for all cores, storing the current frequency along with P-core/E-core classification.
+
+### Data Cleanup
+
+The daemon automatically prunes data older than the configured retention period (default 30 days) on startup and every cleanup interval (default 24 hours). Cleanup runs in a transaction across all tables (battery_samples, backlight_samples, sleep_events, power_state_events, process_samples, cpu_freq_samples).
 
 ## GNOME Extension
 
@@ -139,9 +204,18 @@ On Wayland, there is no way to reload GNOME Shell without logging out. The neste
 
 ### Pitfalls discovered during development
 
+**Calibration Tool**:
 - Battery `power_now` is NOT instantaneous -- it has a long averaging window. You cannot take a quick measurement and trust it.
 - A fixed percentage threshold (e.g., 10% above baseline) doesn't work for detecting display power changes because the display delta (~1-2W) is small relative to total system power (~16W). Use stddev-based thresholds instead.
 - Trying to detect "stability" by low stddev alone fails because a slow downward drift looks stable in a small window. Must also check for trend/slope.
 - Background drift from battery discharge is real and permanent -- readings will always trend slightly. Don't wait for absolute stability; detect when the transient is over and only steady-state drift remains.
 - When run as `sudo`, config files end up owned by root. Use `SUDO_USER` to resolve the real user and `os.Chown` after writing.
 - On hybrid Intel CPUs, `scaling_min_freq` must be set before `scaling_max_freq` can be lowered below it (and vice versa). Write min first, then max, then min again to handle both directions.
+
+**Power Monitor Daemon**:
+- Integer overflow in power calculation: When computing power from voltage × current (if `power_now` isn't reported), divide each by 1000 first to avoid int64 overflow: `(VoltageUV / 1000) * (CurrentUA / 1000)` instead of `(VoltageUV * CurrentUA) / 1000000`.
+- ProcessCollector cmdlineCache pruning: Prune based on `prevTicks` (the PIDs being tracked), not `currentTicks` (current snapshot), otherwise transient PIDs accumulate forever causing a memory leak.
+- D-Bus error handling: Always check and propagate database errors to clients. Silent failures (using `_` blank identifier) hide critical issues like database corruption or connection failures.
+- File descriptor cleanup: Use `defer` for file close and temp file removal to ensure cleanup happens even on early returns or panics (state log processing).
+- Config validation: Validate all config values on load. Reject negative intervals, zero retention periods, etc., before the daemon starts to prevent runtime issues.
+- SQL identifier construction: When using `fmt.Sprintf` to build SQL with table/column names (not supported by placeholders), document that the identifiers are from a hardcoded compile-time constant slice, not user input, to clarify safety.

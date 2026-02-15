@@ -38,7 +38,7 @@ func CollectBattery() (*BatterySample, error) {
 
 	// If power_now isn't reported, compute from voltage * current.
 	if s.PowerUW == 0 && s.VoltageUV > 0 && s.CurrentUA > 0 {
-		s.PowerUW = (s.VoltageUV * s.CurrentUA) / 1000000
+		s.PowerUW = (s.VoltageUV / 1000) * (s.CurrentUA / 1000)
 	}
 
 	// Some firmware reports "Discharging" at full capacity while on AC power.
