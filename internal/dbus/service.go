@@ -58,8 +58,14 @@ func (s *Service) Export() (*godbus.Conn, error) {
 		return nil, fmt.Errorf("connect system bus: %w", err)
 	}
 
-	conn.Export(s, ObjPath, IfaceName)
-	conn.Export(introspect.Introspectable(introspectXML), ObjPath, "org.freedesktop.DBus.Introspectable")
+	if err := conn.Export(s, ObjPath, IfaceName); err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("export service interface: %w", err)
+	}
+	if err := conn.Export(introspect.Introspectable(introspectXML), ObjPath, "org.freedesktop.DBus.Introspectable"); err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("export introspection interface: %w", err)
+	}
 
 	reply, err := conn.RequestName(BusName, godbus.NameFlagDoNotQueue)
 	if err != nil {

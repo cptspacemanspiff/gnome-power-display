@@ -1,0 +1,35 @@
+{
+    "name": "GNOME Power Display",
+    "build": {
+        "dockerfile": "Dockerfile",
+        "context": ".."
+    },
+    "features": {
+        "ghcr.io/devcontainers/features/common-utils:2": {
+            "installZsh": true,
+            "configureZshAsDefaultShell": true,
+            "installOhMyZsh": true,
+            "upgradePackages": true,
+            "username": "vscode",
+            "userUid": "1000",
+            "userGid": "1000"
+        }
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "golang.go",
+                "bazelbuild.vscode-bazel",
+                "redhat.vscode-yaml",
+                "ms-azuretools.vscode-docker"
+            ],
+            "settings": {
+                "go.toolsManagement.autoUpdate": true,
+                "go.useLanguageServer": true,
+                "bazel.enableCodeLens": true
+            }
+        }
+    },
+    "postCreateCommand": "bazel version",
+    "remoteUser": "vscode"
+}

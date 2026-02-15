@@ -76,10 +76,13 @@ type DB struct {
 
 // Open opens or creates the SQLite database at the given path.
 func Open(path string) (*DB, error) {
-	db, err := sql.Open("sqlite3", path+"?_journal_mode=WAL")
+	db, err := sql.Open("sqlite3", path+"?_journal_mode=WAL&_busy_timeout=5000")
 	if err != nil {
 		return nil, fmt.Errorf("open db: %w", err)
 	}
+	// SQLite performs best with a single shared writer connection in-process.
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
 	if _, err := db.Exec(schema); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("init schema: %w", err)

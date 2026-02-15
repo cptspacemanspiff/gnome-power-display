@@ -30,6 +30,7 @@ func NewSleepMonitor(logger *slog.Logger) (*SleepMonitor, error) {
 			dbus.WithMatchMember(member),
 		)
 		if err != nil {
+			conn.Close()
 			return nil, err
 		}
 	}
@@ -52,6 +53,7 @@ func (m *SleepMonitor) Wake() <-chan struct{} {
 // Close stops the monitor.
 func (m *SleepMonitor) Close() {
 	close(m.done)
+	m.conn.Close()
 }
 
 func (m *SleepMonitor) listen() {
@@ -62,6 +64,9 @@ func (m *SleepMonitor) listen() {
 	for {
 		select {
 		case sig := <-ch:
+			if sig == nil {
+				return
+			}
 			if len(sig.Body) < 1 {
 				continue
 			}
