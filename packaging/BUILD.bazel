@@ -29,6 +29,7 @@ nfpm_pkg(
     package_name = "power-monitor-daemon",
     srcs = [
         ":service-files",
+        "config.toml",
         "//cmd/power-monitor-daemon",
     ],
     config = "nfpm-daemon.yaml",
@@ -44,6 +45,7 @@ nfpm_pkg(
     package_name = "power-monitor-daemon",
     srcs = [
         ":service-files",
+        "config.toml",
         "//cmd/power-monitor-daemon",
     ],
     config = "nfpm-daemon.yaml",
