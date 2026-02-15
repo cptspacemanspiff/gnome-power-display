@@ -30,7 +30,8 @@ func main() {
 	selectedRange := 3 // default 6h
 
 	var timeBar fyne.CanvasObject
-	rebuildTimeBar := func() {
+	var rebuildTimeBar func()
+	rebuildTimeBar = func() {
 		timeBar = newTimeRangeBar(selectedRange, func(idx int) {
 			selectedRange = idx
 			rebuildTimeBar()

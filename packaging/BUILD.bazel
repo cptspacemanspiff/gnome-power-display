@@ -3,11 +3,11 @@ load("//build/nfpm:nfpm.bzl", "nfpm_pkg")
 filegroup(
     name = "service-files",
     srcs = [
+        "org.gnome.PowerMonitor.conf",
+        "postinstall-daemon.sh",
         "power-monitor-daemon.service",
         "power-monitor-shutdown.service",
         "power-monitor-sleep-hook",
-        "org.gnome.PowerMonitor.conf",
-        "postinstall-daemon.sh",
         "preremove-daemon.sh",
     ],
     visibility = ["//visibility:public"],
@@ -26,31 +26,31 @@ filegroup(
 
 nfpm_pkg(
     name = "daemon-rpm",
-    config = "nfpm-daemon.yaml",
     package_name = "power-monitor-daemon",
-    packager = "rpm",
     srcs = [
-        "//cmd/power-monitor-daemon",
         ":service-files",
+        "//cmd/power-monitor-daemon",
     ],
+    config = "nfpm-daemon.yaml",
     file_map = {
         "power-monitor-daemon_/power-monitor-daemon": "build/power-monitor-daemon",
     },
+    packager = "rpm",
     version = "0.1.0",
 )
 
 nfpm_pkg(
     name = "daemon-deb",
-    config = "nfpm-daemon.yaml",
     package_name = "power-monitor-daemon",
-    packager = "deb",
     srcs = [
-        "//cmd/power-monitor-daemon",
         ":service-files",
+        "//cmd/power-monitor-daemon",
     ],
+    config = "nfpm-daemon.yaml",
     file_map = {
         "power-monitor-daemon_/power-monitor-daemon": "build/power-monitor-daemon",
     },
+    packager = "deb",
     version = "0.1.0",
 )
 
@@ -58,24 +58,24 @@ nfpm_pkg(
 
 nfpm_pkg(
     name = "extension-rpm",
-    config = "nfpm-extension.yaml",
     package_name = "power-monitor-gnome-extension",
-    packager = "rpm",
     srcs = [
-        "//gnome-extension:extension-files",
         ":scripts",
+        "//gnome-extension:extension-files",
     ],
+    config = "nfpm-extension.yaml",
+    packager = "rpm",
     version = "0.1.0",
 )
 
 nfpm_pkg(
     name = "extension-deb",
-    config = "nfpm-extension.yaml",
     package_name = "power-monitor-gnome-extension",
-    packager = "deb",
     srcs = [
-        "//gnome-extension:extension-files",
         ":scripts",
+        "//gnome-extension:extension-files",
     ],
+    config = "nfpm-extension.yaml",
+    packager = "deb",
     version = "0.1.0",
 )

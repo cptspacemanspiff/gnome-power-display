@@ -1,25 +1,32 @@
-# load("@rules_go//go:def.bzl", "go_binary")
+load("@rules_go//go:def.bzl", "go_binary", "go_library")
 
-# go_binary(
-#     name = "power-gui",
-#     srcs = [
-#         "dbus.go",
-#         "graphs.go",
-#         "main.go",
-#         "stats.go",
-#         "timerange.go",
-#     ],
-#     importpath = "github.com/cptspacemanspiff/gnome-power-display/cmd/power-gui",
-#     visibility = ["//visibility:public"],
-#     deps = [
-#         "//internal/collector",
-#         "@io_fyne_fyne_v2//app",
-#         "@io_fyne_fyne_v2//canvas",
-#         "@io_fyne_fyne_v2//container",
-#         "@io_fyne_fyne_v2//layout",
-#         "@io_fyne_fyne_v2//theme",
-#         "@io_fyne_fyne_v2//widget",
-#         "@io_fyne_fyne_v2//:fyne",
-#         "@com_github_godbus_dbus_v5//:dbus",
-#     ],
-# )
+go_binary(
+    name = "power-gui",
+    embed = [":power-gui_lib"],
+    importpath = "github.com/cptspacemanspiff/gnome-power-display/cmd/power-gui",
+    visibility = ["//visibility:public"],
+)
+
+go_library(
+    name = "power-gui_lib",
+    srcs = [
+        "dbus.go",
+        "graphs.go",
+        "main.go",
+        "stats.go",
+        "timerange.go",
+    ],
+    importpath = "github.com/cptspacemanspiff/gnome-power-display/cmd/power-gui",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//internal/collector",
+        "@com_github_godbus_dbus_v5//:dbus",
+        "@io_fyne_fyne_v2//:fyne",
+        "@io_fyne_fyne_v2//app",
+        "@io_fyne_fyne_v2//canvas",
+        "@io_fyne_fyne_v2//container",
+        "@io_fyne_fyne_v2//layout",
+        "@io_fyne_fyne_v2//theme",
+        "@io_fyne_fyne_v2//widget",
+    ],
+)
