@@ -13,8 +13,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     g++ \
     pkg-config \
-    # Go (will be managed by Bazel, but useful for IDE support)
-    golang-go \
     # SQLite development libraries (for go-sqlite3)
     libsqlite3-dev \
     # D-Bus development libraries
@@ -48,6 +46,3 @@ RUN curl -fsSL https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/
 
 # Set up environment for CGO
 ENV CGO_ENABLED=1
-
-# Verify installations
-RUN bazel version && go version && gcc --version
