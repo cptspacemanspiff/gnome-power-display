@@ -52,7 +52,7 @@ func main() {
 	}()
 
 	// Pin CPU frequency.
-	fmt.Println("[1/4] Locking CPU frequency and disabling turbo boost...")
+	fmt.Println("[1/5] Locking CPU frequency and disabling turbo boost...")
 	restoreCPU, err := calibration.PinCPU()
 	if err != nil {
 		log.Fatalf("pin CPU: %v", err)
@@ -136,13 +136,12 @@ func main() {
 		fmt.Printf(" (settling %v)...", settleWait)
 		time.Sleep(settleWait)
 
-		// Sample power for 30 seconds and average.
+		// Measure power usage over the next fixed sampling window.
 		fmt.Printf(" sampling %v...", sampleDuration)
-		readings, err := calibration.SamplePower(bc, sampleDuration, 500*time.Millisecond)
+		avg, err := calibration.MeasurePowerOverWindow(bc, sampleDuration, 500*time.Millisecond)
 		if err != nil {
-			log.Fatalf("sample power at %d%%: %v", pct, err)
+			log.Fatalf("measure power at %d%%: %v", pct, err)
 		}
-		avg := calibration.AvgPower(readings)
 		fmt.Printf(" avg: %.2f W\n", float64(avg)/1e6)
 
 		samples = append(samples, calibration.BrightnessSample{
