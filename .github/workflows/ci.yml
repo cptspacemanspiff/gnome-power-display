@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  bazel:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run Bazel checks in devcontainer
+        uses: devcontainers/ci@v0.3
+        with:
+          imageName: ghcr.io/cptspacemanspiff/gnome-power-display-devcontainer
+          cacheFrom: ghcr.io/cptspacemanspiff/gnome-power-display-devcontainer
+          push: never
+          runCmd: |
+            bazel test //...
+            bazel build //cmd/power-monitor-daemon //cmd/power-calibrate
