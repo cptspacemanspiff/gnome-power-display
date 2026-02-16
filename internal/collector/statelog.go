@@ -49,6 +49,9 @@ func ReadAndConsumeStateLog(logger *slog.Logger, now time.Time, stateLogPath str
 		}
 		entries = append(entries, e)
 	}
+	if err := scanner.Err(); err != nil {
+		logger.Error("read state log", "err", err)
+	}
 
 	if len(entries) == 0 {
 		return nil

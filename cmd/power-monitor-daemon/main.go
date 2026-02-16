@@ -297,15 +297,18 @@ func importStateLog(store *storage.DB, logger *slog.Logger, stateLogPath string)
 		return
 	}
 	for _, evt := range events {
-		if err := store.InsertPowerStateEvent(evt); err != nil {
+		inserted, err := store.InsertPowerStateEvent(evt)
+		if err != nil {
 			logger.Error("store power state event", "err", err)
-		} else {
+		} else if inserted {
 			logger.Info("imported power state event",
 				"type", evt.Type,
 				"start", evt.StartTime,
 				"end", evt.EndTime,
 				"suspend_secs", evt.SuspendSecs,
 				"hibernate_secs", evt.HibernateSecs)
+		} else {
+			logger.Debug("duplicate power state event skipped", "start", evt.StartTime)
 		}
 	}
 }

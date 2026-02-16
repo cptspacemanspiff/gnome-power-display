@@ -289,12 +289,20 @@ func (d *DB) CPUFreqSamplesInRange(from, to int64) ([]collector.CPUFreqSample, e
 }
 
 // InsertPowerStateEvent inserts a power state event, deduplicating by start_time.
-func (d *DB) InsertPowerStateEvent(e collector.PowerStateEvent) error {
-	_, err := d.db.Exec(
+// It returns whether a new row was inserted.
+func (d *DB) InsertPowerStateEvent(e collector.PowerStateEvent) (bool, error) {
+	res, err := d.db.Exec(
 		"INSERT INTO power_state_events (start_time, end_time, type, suspend_secs, hibernate_secs) SELECT ?, ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM power_state_events WHERE start_time = ?)",
 		e.StartTime, e.EndTime, e.Type, e.SuspendSecs, e.HibernateSecs, e.StartTime,
 	)
-	return err
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	return n > 0, nil
 }
 
 // PowerStateEventsInRange returns power state events within the given time range.

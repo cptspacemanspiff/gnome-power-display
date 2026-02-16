@@ -152,6 +152,7 @@ func (pc *ProcessCollector) Collect() ([]ProcessSample, []CPUFreqSample, *Proces
 	sort.Slice(procs, func(i, j int) bool {
 		return procs[i].ticks > procs[j].ticks
 	})
+	totalProcs := len(procs)
 	if len(procs) > pc.topN {
 		procs = procs[:pc.topN]
 	}
@@ -177,7 +178,7 @@ func (pc *ProcessCollector) Collect() ([]ProcessSample, []CPUFreqSample, *Proces
 	}
 
 	stats := &ProcessCollectStats{
-		TotalProcs:    len(procs),
+		TotalProcs:    totalProcs,
 		TotalTicks:    totalTicks,
 		CapturedTicks: capturedTicks,
 		PerCoreTicks:  perCoreTicks,
@@ -274,4 +275,3 @@ func readCmdline(pid int) string {
 	// Replace null separators with spaces, trim trailing
 	return strings.TrimRight(strings.ReplaceAll(string(data), "\x00", " "), " ")
 }
-

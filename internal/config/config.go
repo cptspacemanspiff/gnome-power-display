@@ -63,8 +63,8 @@ func Load(path string) (*Config, error) {
 	if cfg.Collection.IntervalSeconds <= 0 {
 		return nil, fmt.Errorf("collection.interval_seconds must be positive, got %d", cfg.Collection.IntervalSeconds)
 	}
-	if cfg.Collection.TopProcesses < 0 {
-		return nil, fmt.Errorf("collection.top_processes must be non-negative, got %d", cfg.Collection.TopProcesses)
+	if cfg.Collection.TopProcesses <= 0 {
+		return nil, fmt.Errorf("collection.top_processes must be positive, got %d", cfg.Collection.TopProcesses)
 	}
 	if cfg.Collection.WallClockJumpThresholdSeconds <= 0 {
 		return nil, fmt.Errorf("collection.wall_clock_jump_threshold_seconds must be positive, got %d", cfg.Collection.WallClockJumpThresholdSeconds)
