@@ -28,8 +28,7 @@ jobs:
       - name: Run Bazel checks in devcontainer
         uses: devcontainers/ci@v0.3
         with:
-          imageName: ghcr.io/cptspacemanspiff/gnome-power-display-devcontainer
-          cacheFrom: ghcr.io/cptspacemanspiff/gnome-power-display-devcontainer
+          configFile: .devcontainer/devcontainer.ci.json
           push: never
           runCmd: |
             bazel test //...
