@@ -19,6 +19,10 @@ go_library(
 
 go_test(
     name = "collector_test",
-    srcs = ["battery_test.go"],
+    srcs = [
+        "backlight_test.go",
+        "battery_test.go",
+        "statelog_test.go",
+    ],
     embed = [":collector"],
 )

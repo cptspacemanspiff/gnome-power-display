@@ -1,4 +1,4 @@
-load("@rules_go//go:def.bzl", "go_library")
+load("@rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "dbus",
@@ -10,4 +10,11 @@ go_library(
         "@com_github_godbus_dbus_v5//:dbus",
         "@com_github_godbus_dbus_v5//introspect",
     ],
+)
+
+go_test(
+    name = "dbus_test",
+    srcs = ["service_test.go"],
+    embed = [":dbus"],
+    deps = ["//internal/collector"],
 )

@@ -11,7 +11,7 @@ import (
 
 // CollectBacklight reads backlight brightness from /sys/class/backlight/*.
 func CollectBacklight() (*BacklightSample, error) {
-	matches, err := filepath.Glob("/sys/class/backlight/*")
+	matches, err := filepath.Glob(filepath.Join(sysfsRoot, "class/backlight/*"))
 	if err != nil {
 		return nil, fmt.Errorf("glob backlight: %w", err)
 	}

@@ -1,4 +1,4 @@
-load("@rules_go//go:def.bzl", "go_library")
+load("@rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "storage",
@@ -12,4 +12,13 @@ go_library(
         "//internal/collector",
         "@com_github_mattn_go_sqlite3//:go-sqlite3",
     ],
+)
+
+go_test(
+    name = "storage_test",
+    srcs = [
+        "cleanup_test.go",
+        "db_test.go",
+    ],
+    embed = [":storage"],
 )
