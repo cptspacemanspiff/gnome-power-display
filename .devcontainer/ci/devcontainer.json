@@ -1,5 +1,0 @@
-{
-    "name": "GNOME Power Display CI",
-    "image": "ghcr.io/cptspacemanspiff/gnome-power-display-devcontainer:latest",
-    "remoteUser": "vscode"
-}

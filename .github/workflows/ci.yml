@@ -20,6 +20,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       devcontainer: ${{ steps.filter.outputs.devcontainer }}
+      devcontainer_hash: ${{ steps.hash.outputs.devcontainer_hash }}
+      image_tag: ${{ steps.hash.outputs.image_tag }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,10 +34,56 @@ jobs:
             devcontainer:
               - '.devcontainer/**'
 
-  bazel-prebuilt:
+      - name: Compute devcontainer hash tag
+        id: hash
+        run: |
+          mapfile -t files < <(git ls-files '.devcontainer/**' | sort)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No files found under .devcontainer" >&2
+            exit 1
+          fi
+
+          tmpfile=$(mktemp)
+          for file in "${files[@]}"; do
+            printf '%s\n' "$file" >> "$tmpfile"
+            sha256sum "$file" | cut -d' ' -f1 >> "$tmpfile"
+          done
+
+          hash=$(sha256sum "$tmpfile" | cut -d' ' -f1)
+          rm -f "$tmpfile"
+
+          short_hash=${hash:0:16}
+          echo "devcontainer_hash=$short_hash" >> "$GITHUB_OUTPUT"
+          echo "image_tag=dc-$short_hash" >> "$GITHUB_OUTPUT"
+
+  check-prebuilt-image:
     runs-on: ubuntu-latest
     needs: changes
     if: needs.changes.outputs.devcontainer != 'true'
+    outputs:
+      exists: ${{ steps.check.outputs.exists }}
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check for hash-tagged prebuilt image
+        id: check
+        run: |
+          image="ghcr.io/cptspacemanspiff/gnome-power-display-devcontainer:${{ needs.changes.outputs.image_tag }}"
+          if docker manifest inspect "$image" > /dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  bazel-prebuilt:
+    runs-on: ubuntu-latest
+    needs: [changes, check-prebuilt-image]
+    if: needs.changes.outputs.devcontainer != 'true' && needs.check-prebuilt-image.outputs.exists == 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -47,10 +95,21 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Generate hash-pinned CI devcontainer config
+        run: |
+          mkdir -p .devcontainer/ci-generated
+          cat > .devcontainer/ci-generated/devcontainer.json <<EOF
+          {
+            "name": "GNOME Power Display CI",
+            "image": "ghcr.io/cptspacemanspiff/gnome-power-display-devcontainer:${{ needs.changes.outputs.image_tag }}",
+            "remoteUser": "vscode"
+          }
+          EOF
+
       - name: Run Bazel checks in prebuilt devcontainer
         uses: devcontainers/ci@v0.3
         with:
-          configFile: .devcontainer/ci/devcontainer.json
+          configFile: .devcontainer/ci-generated/devcontainer.json
           push: never
           runCmd: |
             bazel test //...
@@ -58,17 +117,32 @@ jobs:
 
   bazel-from-devcontainer:
     runs-on: ubuntu-latest
-    needs: changes
-    if: needs.changes.outputs.devcontainer == 'true'
+    needs: [changes, check-prebuilt-image]
+    if: needs.changes.outputs.devcontainer == 'true' || needs.check-prebuilt-image.outputs.exists != 'true'
+    permissions:
+      contents: read
+      packages: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run Bazel checks in rebuilt devcontainer
         uses: devcontainers/ci@v0.3
         with:
           configFile: .devcontainer/devcontainer.json
-          push: never
+          imageName: ghcr.io/cptspacemanspiff/gnome-power-display-devcontainer
+          imageTag: ${{ needs.changes.outputs.image_tag }},latest
+          cacheFrom: ghcr.io/cptspacemanspiff/gnome-power-display-devcontainer
+          push: filter
+          refFilterForPush: refs/heads/main
+          eventFilterForPush: push
           runCmd: |
             bazel test //...
             bazel build //cmd/power-monitor-daemon //cmd/power-calibrate
