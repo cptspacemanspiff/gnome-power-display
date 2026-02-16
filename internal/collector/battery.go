@@ -9,9 +9,11 @@ import (
 	"time"
 )
 
+var sysfsRoot = "/sys"
+
 // CollectBattery reads battery info from /sys/class/power_supply/BAT*.
 func CollectBattery() (*BatterySample, error) {
-	matches, err := filepath.Glob("/sys/class/power_supply/BAT*")
+	matches, err := filepath.Glob(filepath.Join(sysfsRoot, "class/power_supply/BAT*"))
 	if err != nil {
 		return nil, fmt.Errorf("glob battery: %w", err)
 	}
@@ -52,7 +54,7 @@ func CollectBattery() (*BatterySample, error) {
 
 // isACOnline checks if any AC adapter is online.
 func isACOnline() bool {
-	matches, err := filepath.Glob("/sys/class/power_supply/AC*/online")
+	matches, err := filepath.Glob(filepath.Join(sysfsRoot, "class/power_supply/AC*/online"))
 	if err != nil {
 		return false
 	}

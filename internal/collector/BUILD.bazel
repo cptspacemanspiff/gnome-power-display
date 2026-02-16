@@ -1,4 +1,4 @@
-load("@rules_go//go:def.bzl", "go_library")
+load("@rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "collector",
@@ -15,4 +15,10 @@ go_library(
     deps = [
         "@com_github_godbus_dbus_v5//:dbus",
     ],
+)
+
+go_test(
+    name = "collector_test",
+    srcs = ["battery_test.go"],
+    embed = [":collector"],
 )
