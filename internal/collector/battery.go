@@ -13,9 +13,9 @@ var sysfsRoot = "/sys"
 
 // historyEntry records a charge/voltage reading at a point in time.
 type historyEntry struct {
-	timestamp  int64
-	chargeUAH  int64
-	voltageUV  int64
+	timestamp int64
+	chargeUAH int64
+	voltageUV int64
 }
 
 // BatteryCollector tracks battery readings and computes averaged power from
@@ -115,6 +115,7 @@ func (bc *BatteryCollector) Collect() (*BatterySample, error) {
 			avgVoltageUV := voltageSum / int64(len(bc.history))
 			if avgVoltageUV > 0 {
 				s.PowerUW = (deltaCharge * (avgVoltageUV / 1000) * 3600) / (deltaTimeSec * 1000)
+				s.PowerFromChargeDelta = s.PowerUW > 0
 			}
 		}
 	}

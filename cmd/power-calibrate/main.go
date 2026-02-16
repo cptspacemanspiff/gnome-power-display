@@ -23,18 +23,15 @@ func main() {
 	fmt.Println("=== Power Monitor Display Calibration ===")
 	fmt.Println()
 	fmt.Println("This tool measures your display's power consumption at various brightness levels.")
-	fmt.Println("The battery controller has a long internal averaging window, so any system")
-	fmt.Println("changes take 1-2 minutes to fully reflect in power readings.")
 	fmt.Println()
 	fmt.Println("Before pressing Enter, please:")
 	fmt.Println("  1. Close ALL unnecessary programs (browser, IDE, etc.)")
 	fmt.Println("  2. Turn off WiFi and Bluetooth")
 	fmt.Println("  3. Unplug all external devices (USB, monitors, etc.)")
 	fmt.Println("  4. Ensure the laptop is running on battery (unplug AC adapter)")
-	fmt.Println("  5. Wait ~60 seconds after making these changes for readings to settle")
+	fmt.Println("  5. Wait a few seconds after making these changes")
 	fmt.Println()
 	fmt.Println("IMPORTANT: Do not touch the laptop or change anything once calibration starts.")
-	fmt.Println("           Any change will take 1-2 minutes to flush from the battery averaging.")
 	fmt.Println()
 	fmt.Print("Press Enter when ready...")
 	bufio.NewReader(os.Stdin).ReadBytes('\n')
@@ -52,7 +49,7 @@ func main() {
 	}()
 
 	// Pin CPU frequency.
-	fmt.Println("[1/5] Locking CPU frequency and disabling turbo boost...")
+	fmt.Println("[1/3] Locking CPU frequency and disabling turbo boost...")
 	restoreCPU, err := calibration.PinCPU()
 	if err != nil {
 		log.Fatalf("pin CPU: %v", err)
@@ -65,88 +62,88 @@ func main() {
 	cpuFreq, _ := calibration.GetCPUFrequency()
 	fmt.Printf("       CPU locked to %d kHz\n", cpuFreq)
 
-	// Set brightness to 0% and let the system settle. The CPU frequency change
-	// and brightness change both need to flush through the battery controller's
-	// averaging window before measurements are meaningful.
-	fmt.Println("       Setting brightness to 0%% and waiting for battery averaging to flush...")
+	// Set brightness to 0% as the starting point for measurements.
+	fmt.Println("       Setting brightness to 0%...")
 	if err := calibration.SetBrightness(0); err != nil {
 		log.Fatalf("set brightness: %v", err)
 	}
-	fmt.Println("       This takes ~90 seconds. Do not touch the laptop.")
-	time.Sleep(90 * time.Second)
-	fmt.Println("       Initial settling complete.")
+	fmt.Println("       Ready.")
 	fmt.Println()
 
 	// Create battery collector for calibration measurements.
 	// Use a 30-second averaging window for charge-delta power calculation.
 	bc := collector.NewBatteryCollector(30)
 
-	// Measure battery update interval.
-	fmt.Println("[2/5] Measuring battery firmware update interval...")
-	fmt.Println("       Rapidly polling power readings to detect value changes...")
-	stats, err := calibration.MeasureUpdateInterval(bc)
-	if err != nil {
-		fmt.Printf("       Warning: could not measure update interval: %v\n", err)
-		fmt.Println("       Using default of 3 seconds")
-		stats.Median = 3 * time.Second
-		stats.Min = 3 * time.Second
-		stats.Max = 3 * time.Second
-	} else {
-		fmt.Printf("       Update interval: median=%v  min=%v  max=%v  (%d samples)\n",
-			stats.Median, stats.Min, stats.Max, len(stats.All))
-	}
-	fmt.Println()
-
-	// Measure controller latency (how many update cycles before reading reflects change).
-	fmt.Println("[3/5] Measuring battery controller latency...")
-	fmt.Println("       Setting brightness to 0%%, stabilizing, then stepping to 100%%...")
-	latency, staleCycles, err := calibration.MeasureLatency(bc, stats.Median)
-	if err != nil {
-		fmt.Printf("       Warning: could not measure latency: %v\n", err)
-		fmt.Println("       Using default of 2 update cycles")
-		staleCycles = 2
-		latency = 2 * stats.Median
-	} else {
-		fmt.Printf("       Latency: %v (%d stale update cycles before reading changed)\n", latency, staleCycles)
-	}
-	fmt.Println()
-
 	// Measure power at each brightness level.
 	levels := []int{0, 25, 50, 75, 100}
 	var samples []calibration.BrightnessSample
 	var baselinePower int64
 
-	// Use the measured latency as the settling wait, with a minimum of 90 seconds.
-	// This is how long the battery controller's averaging window takes to flush.
-	settleWait := latency
-	if settleWait < 90*time.Second {
-		settleWait = 90 * time.Second
-	}
-	sampleDuration := 30 * time.Second
+	// Use a short settling wait after each brightness change.
+	settleWait := 5 * time.Second
+	// Longer window reduces quantization error from charge-step endpoints.
+	sampleDuration := 30 * 2 * 5 * time.Second
+	samplePoll := 500 * time.Millisecond
 
-	fmt.Printf("[4/5] Measuring power at %d brightness levels (settle %v + sample %v each)...\n",
+	fmt.Printf("[2/3] Measuring power at %d brightness levels (settle %v + sample %v each)...\n",
 		len(levels), settleWait, sampleDuration)
 	for i, pct := range levels {
+		brightnessWarned := false
+		lastReassertSec := -1
+
 		fmt.Printf("       Level %d/%d: brightness %d%%", i+1, len(levels), pct)
 		if err := calibration.SetBrightness(pct); err != nil {
 			log.Fatalf("set brightness %d%%: %v", pct, err)
 		}
 
-		// Wait for the battery averaging window to fully flush.
+		// Keep reasserting brightness to counter desktop idle dimming.
 		fmt.Printf(" (settling %v)...", settleWait)
-		time.Sleep(settleWait)
+		fmt.Println()
+		waitWithProgress("         [settle]", settleWait, 1*time.Second, func() {
+			reassertBrightness(pct, &brightnessWarned)
+		})
 
 		// Measure power usage over the next fixed sampling window.
-		fmt.Printf(" sampling %v...", sampleDuration)
-		avg, err := calibration.MeasurePowerOverWindow(bc, sampleDuration, 500*time.Millisecond)
+		fmt.Printf(" sampling %v\n", sampleDuration)
+		avg, avgErr, deltaChargeUAH, chargeQuantUAH, err := calibration.MeasurePowerOverWindowWithDiagnostics(
+			bc,
+			sampleDuration,
+			samplePoll,
+			func(phase string, elapsed, remaining time.Duration, chargeNowUAH, voltageUV int64) {
+				sec := int(elapsed.Seconds())
+				if sec != lastReassertSec {
+					reassertBrightness(pct, &brightnessWarned)
+					lastReassertSec = sec
+				}
+
+				switch phase {
+				case "wait-charge-step":
+					fmt.Printf("         [diag] waiting charge-step t=%2ds charge=%d uAh voltage=%.3f V\n",
+						int(elapsed.Seconds()), chargeNowUAH, float64(voltageUV)/1e6)
+				case "window":
+					fmt.Printf("         [diag] sample t=%2ds remaining=%2ds charge=%d uAh voltage=%.3f V\n",
+						int(elapsed.Seconds()), int(remaining.Seconds()), chargeNowUAH, float64(voltageUV)/1e6)
+				case "wait-end-charge-step":
+					fmt.Printf("         [diag] waiting end charge-step t=%2ds charge=%d uAh voltage=%.3f V\n",
+						int(elapsed.Seconds()), chargeNowUAH, float64(voltageUV)/1e6)
+				case "end":
+					fmt.Printf("         [diag] end t=%2ds charge=%d uAh voltage=%.3f V\n",
+						int(elapsed.Seconds()), chargeNowUAH, float64(voltageUV)/1e6)
+				}
+			},
+		)
 		if err != nil {
 			log.Fatalf("measure power at %d%%: %v", pct, err)
 		}
-		fmt.Printf(" avg: %.2f W\n", float64(avg)/1e6)
+		fmt.Printf("       -> avg: %.2f W +/- %.3f W (delta charge: %d uAh, q=%d uAh)\n",
+			float64(avg)/1e6, float64(avgErr)/1e6, deltaChargeUAH, chargeQuantUAH)
 
 		samples = append(samples, calibration.BrightnessSample{
-			BrightnessPct: pct,
-			AvgPowerUW:    avg,
+			BrightnessPct:         pct,
+			AvgPowerUW:            avg,
+			AvgPowerErrorUW:       avgErr,
+			DeltaChargeUAH:        deltaChargeUAH,
+			ChargeQuantizationUAH: chargeQuantUAH,
 		})
 		if pct == 0 {
 			baselinePower = avg
@@ -156,9 +153,9 @@ func main() {
 
 	// Write results.
 	result := calibration.CalibrationResult{
-		UpdateIntervalMs: stats.Median.Milliseconds(),
-		LatencyMs:        latency.Milliseconds(),
-		StaleCycles:      staleCycles,
+		UpdateIntervalMs: 0,
+		LatencyMs:        0,
+		StaleCycles:      0,
 		BaselinePowerUW:  baselinePower,
 		Samples:          samples,
 		CPUFrequencyKHz:  cpuFreq,
@@ -196,16 +193,49 @@ func main() {
 		}
 	}
 
-	fmt.Printf("[5/5] Calibration complete! Results written to:\n")
+	fmt.Printf("[3/3] Calibration complete! Results written to:\n")
 	fmt.Printf("       %s\n", outPath)
 	fmt.Println()
 	fmt.Println("Summary:")
-	fmt.Printf("  Update interval:  %v (min=%v, max=%v)\n", stats.Median, stats.Min, stats.Max)
-	fmt.Printf("  Controller lag:   %v (%d stale cycles)\n", latency, staleCycles)
 	fmt.Printf("  Baseline power:   %.2f W (display off)\n", float64(baselinePower)/1e6)
 	for _, s := range samples {
 		displayPower := float64(s.AvgPowerUW-baselinePower) / 1e6
-		fmt.Printf("  Brightness %3d%%:  %.2f W total (%.2f W display)\n",
-			s.BrightnessPct, float64(s.AvgPowerUW)/1e6, displayPower)
+		fmt.Printf("  Brightness %3d%%:  %.2f +/- %.3f W total (%.2f W display)\n",
+			s.BrightnessPct, float64(s.AvgPowerUW)/1e6, float64(s.AvgPowerErrorUW)/1e6, displayPower)
+	}
+}
+
+func waitWithProgress(prefix string, total, tick time.Duration, onTick func()) {
+	if total <= 0 {
+		return
+	}
+	if tick <= 0 {
+		tick = time.Second
+	}
+
+	deadline := time.Now().Add(total)
+	for {
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			fmt.Printf("%s done\n", prefix)
+			return
+		}
+
+		fmt.Printf("%s remaining: %2ds\n", prefix, int(remaining.Round(time.Second).Seconds()))
+		if onTick != nil {
+			onTick()
+		}
+		sleepFor := tick
+		if sleepFor > remaining {
+			sleepFor = remaining
+		}
+		time.Sleep(sleepFor)
+	}
+}
+
+func reassertBrightness(pct int, warned *bool) {
+	if err := calibration.SetBrightness(pct); err != nil && !*warned {
+		log.Printf("warning: failed to reassert brightness %d%%: %v", pct, err)
+		*warned = true
 	}
 }

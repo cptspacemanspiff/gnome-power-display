@@ -1,0 +1,20 @@
+30 seconds nominal, wait for battery charge change to start and stop.
+
+Summary:
+  Baseline power:   6.99 W (display off)
+  Brightness   0%:  6.99 +/- 1.747 W total (0.00 W display)
+  Brightness  25%:  7.54 +/- 1.509 W total (0.56 W display)
+  Brightness  50%:  8.19 +/- 1.638 W total (1.20 W display)
+  Brightness  75%:  8.95 +/- 1.791 W total (1.97 W display)
+  Brightness 100%:  9.23 +/- 1.845 W total (2.24 W display)
+Restoring CPU settings...
+
+5 min
+
+Summary:
+  Baseline power:   6.97 W (display off)
+  Brightness   0%:  6.97 +/- 0.184 W total (0.00 W display)
+  Brightness  25%:  7.61 +/- 0.186 W total (0.63 W display)
+  Brightness  50%:  8.16 +/- 0.185 W total (1.18 W display)
+  Brightness  75%:  8.80 +/- 0.183 W total (1.83 W display)
+  Brightness 100%:  9.45 +/- 0.182 W total (2.48 W display)

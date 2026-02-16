@@ -10,6 +10,9 @@ Bazel with `rules_go` and `gazelle`. Dependencies managed via `go.mod`.
 # Build everything
 bazel build //cmd/power-monitor-daemon //cmd/power-calibrate
 
+# Run tests (use Bazel, not go test)
+bazel test //...
+
 # Run daemon
 bazel run //cmd/power-monitor-daemon
 bazel run //cmd/power-monitor-daemon -- -verbose

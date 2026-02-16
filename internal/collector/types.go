@@ -2,14 +2,15 @@ package collector
 
 // BatterySample holds a snapshot of battery state from /sys/class/power_supply/BAT*.
 type BatterySample struct {
-	Timestamp    int64  `json:"timestamp"`
-	VoltageUV    int64  `json:"voltage_uv"`
-	CurrentUA    int64  `json:"current_ua"`
-	PowerUW      int64  `json:"power_uw"`
-	SysfsPowerUW int64  `json:"sysfs_power_uw"`
-	ChargeNowUAH int64  `json:"charge_now_uah"`
-	CapacityPct  int    `json:"capacity_pct"`
-	Status       string `json:"status"`
+	Timestamp            int64  `json:"timestamp"`
+	VoltageUV            int64  `json:"voltage_uv"`
+	CurrentUA            int64  `json:"current_ua"`
+	PowerUW              int64  `json:"power_uw"`
+	PowerFromChargeDelta bool   `json:"power_from_charge_delta"`
+	SysfsPowerUW         int64  `json:"sysfs_power_uw"`
+	ChargeNowUAH         int64  `json:"charge_now_uah"`
+	CapacityPct          int    `json:"capacity_pct"`
+	Status               string `json:"status"`
 }
 
 // BacklightSample holds a snapshot of display backlight state.

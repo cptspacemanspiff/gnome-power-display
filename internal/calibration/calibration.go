@@ -3,7 +3,6 @@ package calibration
 import (
 	"fmt"
 	"log"
-	"math"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -12,12 +11,6 @@ import (
 
 	"github.com/cptspacemanspiff/gnome-power-display/internal/collector"
 )
-
-// PowerReading is a timestamped power measurement.
-type PowerReading struct {
-	Timestamp time.Time
-	PowerUW   int64
-}
 
 // CalibrationResult holds the output of a calibration run.
 type CalibrationResult struct {
@@ -32,14 +25,19 @@ type CalibrationResult struct {
 
 // BrightnessSample holds power at a given brightness level.
 type BrightnessSample struct {
-	BrightnessPct int   `json:"brightness_pct"`
-	AvgPowerUW    int64 `json:"avg_power_uw"`
+	BrightnessPct         int   `json:"brightness_pct"`
+	AvgPowerUW            int64 `json:"avg_power_uw"`
+	AvgPowerErrorUW       int64 `json:"avg_power_error_uw"`
+	DeltaChargeUAH        int64 `json:"delta_charge_uah"`
+	ChargeQuantizationUAH int64 `json:"charge_quantization_uah"`
 }
 
 // BatterySampler provides battery samples for calibration measurements.
 type BatterySampler interface {
 	Collect() (*collector.BatterySample, error)
 }
+
+const defaultChargeQuantizationUAH int64 = 1000
 
 // PinCPU disables turbo boost and locks all CPU cores to base frequency.
 // Returns a restore function that undoes the changes.
@@ -182,35 +180,74 @@ func GetBrightness() (current, max int64, err error) {
 	return current, max, nil
 }
 
-// AvgPower computes the average power from a slice of readings.
-func AvgPower(readings []PowerReading) int64 {
-	if len(readings) == 0 {
-		return 0
-	}
-	var total int64
-	for _, r := range readings {
-		total += r.PowerUW
-	}
-	return total / int64(len(readings))
+// MeasurePowerOverWindow measures average power over the next fixed window.
+// It waits for the next quantized charge-step change, then measures energy
+// using charge delta across the window and average sampled voltage.
+func MeasurePowerOverWindow(bs BatterySampler, window, poll time.Duration) (int64, error) {
+	powerUW, _, _, _, err := MeasurePowerOverWindowWithDiagnostics(bs, window, poll, nil)
+	return powerUW, err
 }
 
-// MeasurePowerOverWindow measures average power over the next fixed window.
-// It uses charge delta across the window and average voltage for higher
-// accuracy, with a fallback to average sampled power if charge data is not
-// usable for the window.
-func MeasurePowerOverWindow(bs BatterySampler, window, poll time.Duration) (int64, error) {
+// MeasurePowerOverWindowWithDiagnostics measures average power over the next
+// fixed window and emits optional per-sample diagnostics.
+func MeasurePowerOverWindowWithDiagnostics(
+	bs BatterySampler,
+	window, poll time.Duration,
+	onSample func(phase string, elapsed, remaining time.Duration, chargeNowUAH, voltageUV int64),
+) (powerUW, powerErrorUW, deltaChargeUAH, chargeQuantizationUAH int64, err error) {
 	if window <= 0 {
-		return 0, fmt.Errorf("window must be > 0")
+		return 0, 0, 0, 0, fmt.Errorf("window must be > 0")
 	}
 	if poll <= 0 {
-		return 0, fmt.Errorf("poll interval must be > 0")
+		return 0, 0, 0, 0, fmt.Errorf("poll interval must be > 0")
 	}
 
-	startSample, err := bs.Collect()
+	initialSample, err := bs.Collect()
 	if err != nil {
-		return 0, fmt.Errorf("collect start sample: %w", err)
+		return 0, 0, 0, 0, fmt.Errorf("collect initial sample: %w", err)
 	}
+	if initialSample.ChargeNowUAH <= 0 {
+		return 0, 0, 0, 0, fmt.Errorf("initial charge sample unavailable")
+	}
+
+	waitStart := time.Now()
+	maxWait := 10 * window
+	if maxWait < 500*time.Millisecond {
+		maxWait = 500 * time.Millisecond
+	}
+
+	chargeBeforeStep := initialSample.ChargeNowUAH
+	startSample := initialSample
+	observedQuantizationUAH := int64(0)
+	for {
+		if time.Since(waitStart) > maxWait {
+			return 0, 0, 0, 0, fmt.Errorf("timed out waiting for charge-step change")
+		}
+
+		time.Sleep(poll)
+		sample, err := bs.Collect()
+		if err != nil {
+			return 0, 0, 0, 0, fmt.Errorf("collect charge-step sample: %w", err)
+		}
+
+		if onSample != nil {
+			onSample("wait-charge-step", time.Since(waitStart), 0, sample.ChargeNowUAH, sample.VoltageUV)
+		}
+
+		if sample.ChargeNowUAH <= 0 {
+			continue
+		}
+		if step := absInt64(sample.ChargeNowUAH - chargeBeforeStep); step > 0 {
+			observedQuantizationUAH = minNonZeroInt64(observedQuantizationUAH, step)
+		}
+		if sample.ChargeNowUAH != chargeBeforeStep {
+			startSample = sample
+			break
+		}
+	}
+
 	startTime := time.Now()
+	startChargeUAH := startSample.ChargeNowUAH
 
 	voltageSum := int64(0)
 	voltageCount := int64(0)
@@ -218,16 +255,7 @@ func MeasurePowerOverWindow(bs BatterySampler, window, poll time.Duration) (int6
 		voltageSum += startSample.VoltageUV
 		voltageCount++
 	}
-
-	powerSum := int64(0)
-	powerCount := int64(0)
-	if startSample.PowerUW > 0 {
-		powerSum += startSample.PowerUW
-		powerCount++
-	}
-
-	endSample := startSample
-	endTime := startTime
+	lastChargeUAH := startSample.ChargeNowUAH
 	deadline := startTime.Add(window)
 
 	for {
@@ -243,295 +271,113 @@ func MeasurePowerOverWindow(bs BatterySampler, window, poll time.Duration) (int6
 
 		sample, err := bs.Collect()
 		if err != nil {
-			return 0, fmt.Errorf("collect window sample: %w", err)
+			return 0, 0, 0, 0, fmt.Errorf("collect window sample: %w", err)
 		}
-		endSample = sample
-		endTime = time.Now()
+		now := time.Now()
+		if sample.ChargeNowUAH > 0 && lastChargeUAH > 0 {
+			if step := absInt64(sample.ChargeNowUAH - lastChargeUAH); step > 0 {
+				observedQuantizationUAH = minNonZeroInt64(observedQuantizationUAH, step)
+			}
+			lastChargeUAH = sample.ChargeNowUAH
+		}
+
+		if onSample != nil {
+			remaining = deadline.Sub(now)
+			if remaining < 0 {
+				remaining = 0
+			}
+			onSample("window", now.Sub(startTime), remaining, sample.ChargeNowUAH, sample.VoltageUV)
+		}
 
 		if sample.VoltageUV > 0 {
 			voltageSum += sample.VoltageUV
 			voltageCount++
 		}
-		if sample.PowerUW > 0 {
-			powerSum += sample.PowerUW
-			powerCount++
+	}
+
+	endWaitStart := time.Now()
+	endWaitMax := 10 * window
+	if endWaitMax < 500*time.Millisecond {
+		endWaitMax = 500 * time.Millisecond
+	}
+
+	endSample := startSample
+	endTime := time.Time{}
+	for {
+		if time.Since(endWaitStart) > endWaitMax {
+			return 0, 0, 0, 0, fmt.Errorf("timed out waiting for end charge-step change")
 		}
+
+		time.Sleep(poll)
+		sample, err := bs.Collect()
+		if err != nil {
+			return 0, 0, 0, 0, fmt.Errorf("collect end charge-step sample: %w", err)
+		}
+		now := time.Now()
+
+		if onSample != nil {
+			onSample("wait-end-charge-step", now.Sub(startTime), 0, sample.ChargeNowUAH, sample.VoltageUV)
+		}
+
+		if sample.ChargeNowUAH <= 0 {
+			continue
+		}
+		if lastChargeUAH > 0 {
+			if step := absInt64(sample.ChargeNowUAH - lastChargeUAH); step > 0 {
+				observedQuantizationUAH = minNonZeroInt64(observedQuantizationUAH, step)
+			}
+		}
+		if sample.ChargeNowUAH != lastChargeUAH {
+			endSample = sample
+			endTime = now
+			break
+		}
+	}
+
+	if onSample != nil {
+		onSample("end", endTime.Sub(startTime), 0, endSample.ChargeNowUAH, endSample.VoltageUV)
 	}
 
 	elapsed := endTime.Sub(startTime)
 	if elapsed <= 0 {
-		return 0, fmt.Errorf("measurement window elapsed time is zero")
+		return 0, 0, 0, 0, fmt.Errorf("measurement window elapsed time is zero")
+	}
+	if startChargeUAH <= 0 || endSample.ChargeNowUAH <= 0 {
+		return 0, 0, 0, 0, fmt.Errorf("charge samples unavailable for measurement")
 	}
 
-	if voltageCount > 0 && startSample.ChargeNowUAH > 0 && endSample.ChargeNowUAH > 0 {
-		deltaChargeUAH := absInt64(startSample.ChargeNowUAH - endSample.ChargeNowUAH)
-		if deltaChargeUAH > 0 {
-			avgVoltageUV := voltageSum / voltageCount
-			if avgVoltageUV > 0 {
-				// power_uW = delta_charge_uAh * avg_voltage_uV * 3_600_000 / elapsed_ns
-				powerUW := (deltaChargeUAH * avgVoltageUV * 3600000) / elapsed.Nanoseconds()
-				if powerUW > 0 {
-					return powerUW, nil
-				}
-			}
-		}
+	deltaChargeUAH = absInt64(startChargeUAH - endSample.ChargeNowUAH)
+	if deltaChargeUAH == 0 {
+		return 0, 0, 0, 0, fmt.Errorf("charge did not change over measurement window")
 	}
 
-	if powerCount > 0 {
-		return powerSum / powerCount, nil
+	if voltageCount <= 0 {
+		return 0, 0, 0, 0, fmt.Errorf("no valid voltage samples for measurement")
+	}
+	avgVoltageUV := voltageSum / voltageCount
+	if avgVoltageUV <= 0 {
+		return 0, 0, 0, 0, fmt.Errorf("average voltage is not positive")
 	}
 
-	return 0, fmt.Errorf("no valid samples for power measurement")
-}
-
-// UpdateIntervalStats holds the result of measuring battery update intervals.
-type UpdateIntervalStats struct {
-	Median time.Duration
-	Min    time.Duration
-	Max    time.Duration
-	All    []time.Duration
-}
-
-// MeasureUpdateInterval determines how often the battery firmware/kernel updates
-// the power reading in sysfs. It rapidly polls the power value and measures the
-// time between value changes.
-func MeasureUpdateInterval(bs BatterySampler) (UpdateIntervalStats, error) {
-	// Poll rapidly for up to 30 seconds, looking for value transitions.
-	// Uses SysfsPowerUW (raw firmware value) to detect firmware update boundaries.
-	var transitions []time.Time
-	var lastValue int64
-	first := true
-	deadline := time.Now().Add(30 * time.Second)
-
-	for time.Now().Before(deadline) {
-		sample, err := bs.Collect()
-		if err != nil {
-			time.Sleep(10 * time.Millisecond)
-			continue
-		}
-		if first {
-			lastValue = sample.SysfsPowerUW
-			first = false
-		} else if sample.SysfsPowerUW != lastValue {
-			transitions = append(transitions, time.Now())
-			lastValue = sample.SysfsPowerUW
-			// We need at least a few transitions to get a reliable interval.
-			if len(transitions) >= 6 {
-				break
-			}
-		}
-		time.Sleep(10 * time.Millisecond)
+	// power_uW = delta_charge_uAh * avg_voltage_uV * 3_600_000 / elapsed_ns
+	powerUW = (deltaChargeUAH * avgVoltageUV * 3600000) / elapsed.Nanoseconds()
+	if powerUW <= 0 {
+		return 0, 0, 0, 0, fmt.Errorf("computed power is not positive")
 	}
 
-	if len(transitions) < 3 {
-		return UpdateIntervalStats{}, fmt.Errorf("only detected %d value changes in 30s, need at least 3", len(transitions))
+	chargeQuantizationUAH = observedQuantizationUAH
+	if chargeQuantizationUAH <= 0 {
+		chargeQuantizationUAH = defaultChargeQuantizationUAH
 	}
 
-	// Compute intervals between consecutive transitions.
-	var intervals []time.Duration
-	for i := 1; i < len(transitions); i++ {
-		intervals = append(intervals, transitions[i].Sub(transitions[i-1]))
+	// Propagate dominant uncertainty from quantized charge readings.
+	// With endpoint quantization +/-q/2 each, delta-charge uncertainty is +/-q.
+	powerErrorUW = (chargeQuantizationUAH * avgVoltageUV * 3600000) / elapsed.Nanoseconds()
+	if powerErrorUW < 0 {
+		powerErrorUW = -powerErrorUW
 	}
 
-	// Simple sort for median/min/max.
-	for i := range intervals {
-		for j := i + 1; j < len(intervals); j++ {
-			if intervals[j] < intervals[i] {
-				intervals[i], intervals[j] = intervals[j], intervals[i]
-			}
-		}
-	}
-
-	return UpdateIntervalStats{
-		Median: intervals[len(intervals)/2],
-		Min:    intervals[0],
-		Max:    intervals[len(intervals)-1],
-		All:    intervals,
-	}, nil
-}
-
-// MeasureLatency measures the number of battery update cycles between a brightness
-// step change and when the power reading actually reflects it. This captures any
-// internal averaging the battery controller may do. The updateInterval should come
-// from MeasureUpdateInterval. Returns the latency as a duration and the number of
-// stale update cycles observed.
-func MeasureLatency(bs BatterySampler, updateInterval time.Duration) (latency time.Duration, staleCycles int, err error) {
-	// Set brightness to 0% and wait for readings to stabilize.
-	if err := SetBrightness(0); err != nil {
-		return 0, 0, fmt.Errorf("set brightness 0%%: %w", err)
-	}
-	log.Println("  latency: waiting for baseline to stabilize...")
-
-	// Poll until the rolling stddev drops, indicating the averaging window
-	// has flushed and readings reflect the current state.
-	baselineReadings, err := WaitForStable(bs, updateInterval)
-	if err != nil {
-		return 0, 0, fmt.Errorf("baseline stabilize: %w", err)
-	}
-	baselineAvg := AvgPower(baselineReadings)
-	if baselineAvg == 0 {
-		return 0, 0, fmt.Errorf("baseline power is zero")
-	}
-	baselineStdDev := stdDev(baselineReadings, baselineAvg)
-	// Threshold: 3 standard deviations above baseline. This is much more
-	// sensitive than a fixed percentage, since system noise is typically small
-	// relative to total power draw.
-	threshold := baselineAvg + 3*baselineStdDev
-	log.Printf("  latency: baseline avg=%d uW (%.2f W), stddev=%d uW (%.2f W), threshold=%d uW (%.2f W)",
-		baselineAvg, float64(baselineAvg)/1e6,
-		baselineStdDev, float64(baselineStdDev)/1e6,
-		threshold, float64(threshold)/1e6)
-
-	// Sync to an update boundary: poll until we see a value change, so we know
-	// we're right at the start of a fresh cycle.
-	var lastValue int64
-	sample, _ := bs.Collect()
-	if sample != nil {
-		lastValue = sample.SysfsPowerUW
-	}
-	syncDeadline := time.Now().Add(2 * updateInterval)
-	for time.Now().Before(syncDeadline) {
-		s, err := bs.Collect()
-		if err == nil && s.SysfsPowerUW != lastValue {
-			break
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-
-	// Now make the step change right after the update boundary.
-	changeTime := time.Now()
-	if err := SetBrightness(100); err != nil {
-		return 0, 0, fmt.Errorf("set brightness 100%%: %w", err)
-	}
-	log.Printf("  latency: brightness set to 100%% at %v", changeTime.Format("15:04:05.000"))
-
-	// Poll each update cycle. The reading will ramp up as the averaging window
-	// mixes in the new power level. Latency = when the stddev of recent readings
-	// drops back to baseline stddev level, meaning the averaging window has fully
-	// flushed and the reading has settled at the new level.
-	maxCycles := 120 // up to ~2 minutes
-	pollOffset := updateInterval / 5
-	const windowSize = 5
-	var readings []PowerReading
-
-	log.Printf("  latency: waiting for readings to settle (baseline stddev=%.2f W, window=%d)",
-		float64(baselineStdDev)/1e6, windowSize)
-
-	for cycle := 1; cycle <= maxCycles; cycle++ {
-		nextBoundary := changeTime.Add(time.Duration(cycle)*updateInterval + pollOffset)
-		sleepFor := time.Until(nextBoundary)
-		if sleepFor > 0 {
-			time.Sleep(sleepFor)
-		}
-
-		s, err := bs.Collect()
-		if err != nil {
-			log.Printf("  latency: cycle %2d  error: %v", cycle, err)
-			continue
-		}
-		elapsed := time.Since(changeTime)
-		readings = append(readings, PowerReading{Timestamp: time.Now(), PowerUW: s.PowerUW})
-		delta := float64(s.PowerUW-baselineAvg) / 1e6
-
-		if len(readings) >= windowSize {
-			window := readings[len(readings)-windowSize:]
-			windowAvg := AvgPower(window)
-			windowSD := stdDev(window, windowAvg)
-			// Settled = stddev of recent window is within 2x of baseline stddev.
-			settled := windowSD <= 2*baselineStdDev
-
-			log.Printf("  latency: cycle %2d  t=+%v  power=%.2f W  delta=%+.2f W  window_avg=%.2f W  window_sd=%.4f W  settled=%v",
-				cycle, elapsed.Round(time.Millisecond), float64(s.PowerUW)/1e6, delta,
-				float64(windowAvg)/1e6, float64(windowSD)/1e6, settled)
-
-			if settled {
-				log.Printf("  latency: fully settled at cycle %d (t=+%v), stddev %.4f W <= 2x baseline %.4f W",
-					cycle, elapsed.Round(time.Millisecond), float64(windowSD)/1e6, float64(baselineStdDev)/1e6)
-				return elapsed, cycle, nil
-			}
-		} else {
-			log.Printf("  latency: cycle %2d  t=+%v  power=%.2f W  delta=%+.2f W  (collecting window %d/%d)",
-				cycle, elapsed.Round(time.Millisecond), float64(s.PowerUW)/1e6, delta, len(readings), windowSize)
-		}
-	}
-
-	return 0, maxCycles, fmt.Errorf("power reading did not settle within %d cycles", maxCycles)
-}
-
-// WaitForStable samples power at the update interval and waits until the
-// rate of change has settled to a steady state. Battery voltage naturally
-// drifts as the battery discharges, so readings never truly stabilize — but
-// after a brightness step change, the controller's averaging window causes
-// an extra transient on top of the background drift. We detect when that
-// transient is over by splitting the window into quarters and comparing the
-// slope (rate of change) of the first half vs second half. When the slopes
-// match, the transient has passed and we're left with just background drift.
-func WaitForStable(bs BatterySampler, updateInterval time.Duration) ([]PowerReading, error) {
-	const windowSize = 20
-	const maxWait = 120 * time.Second
-
-	var all []PowerReading
-	deadline := time.Now().Add(maxWait)
-
-	for time.Now().Before(deadline) {
-		sample, err := bs.Collect()
-		if err != nil {
-			time.Sleep(updateInterval)
-			continue
-		}
-		all = append(all, PowerReading{Timestamp: time.Now(), PowerUW: sample.PowerUW})
-
-		if len(all) >= windowSize {
-			window := all[len(all)-windowSize:]
-			avg := AvgPower(window)
-			sd := stdDev(window, avg)
-
-			// Compute slope of each half (uW per sample).
-			// Slope = (mean of second quarter - mean of first quarter) per half-window.
-			q := windowSize / 4
-			q1Avg := AvgPower(window[:q])        // oldest quarter
-			q2Avg := AvgPower(window[q : 2*q])   // second quarter
-			q3Avg := AvgPower(window[2*q : 3*q]) // third quarter
-			q4Avg := AvgPower(window[3*q:])      // newest quarter
-
-			olderSlope := float64(q2Avg - q1Avg) // change across first half
-			newerSlope := float64(q4Avg - q3Avg) // change across second half
-			slopeDiff := math.Abs(olderSlope - newerSlope)
-
-			// Normalize slope difference by stddev. If the slopes differ
-			// by less than 1 stddev, the transient is over.
-			slopeDiffSigmas := float64(0)
-			if sd > 0 {
-				slopeDiffSigmas = slopeDiff / float64(sd)
-			}
-
-			log.Printf("  stabilize: n=%d  avg=%.2f W  stddev=%.2f W  q1=%.2f q2=%.2f q3=%.2f q4=%.2f  older_slope=%+.0f  newer_slope=%+.0f  slope_diff=%.1fσ",
-				len(all), float64(avg)/1e6, float64(sd)/1e6,
-				float64(q1Avg)/1e6, float64(q2Avg)/1e6, float64(q3Avg)/1e6, float64(q4Avg)/1e6,
-				olderSlope/1e3, newerSlope/1e3, slopeDiffSigmas)
-
-			// Stable when slopes match (transient over) and we have low noise.
-			if slopeDiffSigmas < 1.0 && float64(sd)/float64(avg) < 0.02 {
-				log.Printf("  stabilize: settled after %d samples (slopes match, transient over)", len(all))
-				return window, nil
-			}
-		}
-		time.Sleep(updateInterval)
-	}
-	return nil, fmt.Errorf("readings did not stabilize within %v", maxWait)
-}
-
-func stdDev(readings []PowerReading, mean int64) int64 {
-	if len(readings) < 2 {
-		return 0
-	}
-	var sumSq float64
-	for _, r := range readings {
-		d := float64(r.PowerUW - mean)
-		sumSq += d * d
-	}
-	variance := sumSq / float64(len(readings)-1)
-	return int64(math.Sqrt(variance))
+	return powerUW, powerErrorUW, deltaChargeUAH, chargeQuantizationUAH, nil
 }
 
 func absInt64(v int64) int64 {
@@ -539,6 +385,19 @@ func absInt64(v int64) int64 {
 		return -v
 	}
 	return v
+}
+
+func minNonZeroInt64(a, b int64) int64 {
+	if a <= 0 {
+		return b
+	}
+	if b <= 0 {
+		return a
+	}
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func findBacklightDir() (string, error) {
