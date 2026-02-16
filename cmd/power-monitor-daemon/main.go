@@ -159,6 +159,9 @@ func main() {
 		defer sleepMon.Close()
 	}
 
+	// Start battery collector with averaging window.
+	batteryCollector := collector.NewBatteryCollector(int64(cfg.Collection.PowerAverageSeconds))
+
 	// Start process collector.
 	procCollector := collector.NewProcessCollector(cfg.Collection.TopProcesses)
 
@@ -186,7 +189,7 @@ func main() {
 				importStateLog(store, sleepLog, cfg.Storage.StateLogPath)
 			}
 			lastTick = now
-			if sample, err := collector.CollectBattery(); err == nil {
+			if sample, err := batteryCollector.Collect(); err == nil {
 				batteryLog.Info("sample",
 					"capacity_pct", sample.CapacityPct,
 					"status", sample.Status,

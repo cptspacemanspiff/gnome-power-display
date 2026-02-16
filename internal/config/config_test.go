@@ -35,6 +35,9 @@ func TestDefaultConfig(t *testing.T) {
 	if cfg.Collection.WallClockJumpThresholdSeconds != 15 {
 		t.Fatalf("unexpected WallClockJumpThresholdSeconds: %d", cfg.Collection.WallClockJumpThresholdSeconds)
 	}
+	if cfg.Collection.PowerAverageSeconds != 30 {
+		t.Fatalf("unexpected PowerAverageSeconds: %d", cfg.Collection.PowerAverageSeconds)
+	}
 	if cfg.Cleanup.RetentionDays != 30 {
 		t.Fatalf("unexpected RetentionDays: %d", cfg.Cleanup.RetentionDays)
 	}
@@ -71,6 +74,9 @@ interval_seconds = 8
 	}
 	if cfg.Collection.WallClockJumpThresholdSeconds != 15 {
 		t.Fatalf("WallClockJumpThresholdSeconds = %d, want default 15", cfg.Collection.WallClockJumpThresholdSeconds)
+	}
+	if cfg.Collection.PowerAverageSeconds != 30 {
+		t.Fatalf("PowerAverageSeconds = %d, want default 30", cfg.Collection.PowerAverageSeconds)
 	}
 	if cfg.Cleanup.RetentionDays != 30 {
 		t.Fatalf("RetentionDays = %d, want default 30", cfg.Cleanup.RetentionDays)
@@ -127,6 +133,14 @@ top_processes = 0
 wall_clock_jump_threshold_seconds = 0
 `,
 			wantErrSub: "collection.wall_clock_jump_threshold_seconds must be positive",
+		},
+		{
+			name: "power_average_seconds must be positive",
+			contents: `
+[collection]
+power_average_seconds = 0
+`,
+			wantErrSub: "collection.power_average_seconds must be positive",
 		},
 		{
 			name: "retention_days must be positive",

@@ -12,5 +12,8 @@ go_library(
     srcs = ["main.go"],
     importpath = "github.com/cptspacemanspiff/gnome-power-display/cmd/power-calibrate",
     visibility = ["//visibility:private"],
-    deps = ["//internal/calibration"],
+    deps = [
+        "//internal/calibration",
+        "//internal/collector",
+    ],
 )

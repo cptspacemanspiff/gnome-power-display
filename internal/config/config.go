@@ -22,6 +22,7 @@ type CollectionConfig struct {
 	IntervalSeconds               int `toml:"interval_seconds"`
 	TopProcesses                  int `toml:"top_processes"`
 	WallClockJumpThresholdSeconds int `toml:"wall_clock_jump_threshold_seconds"`
+	PowerAverageSeconds           int `toml:"power_average_seconds"`
 }
 
 type CleanupConfig struct {
@@ -39,6 +40,7 @@ func DefaultConfig() *Config {
 			IntervalSeconds:               5,
 			TopProcesses:                  10,
 			WallClockJumpThresholdSeconds: 15,
+			PowerAverageSeconds:           30,
 		},
 		Cleanup: CleanupConfig{
 			RetentionDays: 30,
@@ -68,6 +70,9 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.Collection.WallClockJumpThresholdSeconds <= 0 {
 		return nil, fmt.Errorf("collection.wall_clock_jump_threshold_seconds must be positive, got %d", cfg.Collection.WallClockJumpThresholdSeconds)
+	}
+	if cfg.Collection.PowerAverageSeconds <= 0 {
+		return nil, fmt.Errorf("collection.power_average_seconds must be positive, got %d", cfg.Collection.PowerAverageSeconds)
 	}
 	if cfg.Cleanup.RetentionDays <= 0 {
 		return nil, fmt.Errorf("cleanup.retention_days must be positive, got %d", cfg.Cleanup.RetentionDays)

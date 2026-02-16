@@ -3,6 +3,7 @@ package storage
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 
 	_ "github.com/mattn/go-sqlite3"
 
@@ -16,6 +17,8 @@ CREATE TABLE IF NOT EXISTS battery_samples (
 	voltage_uv INTEGER NOT NULL,
 	current_ua INTEGER NOT NULL,
 	power_uw INTEGER NOT NULL,
+	sysfs_power_uw INTEGER NOT NULL DEFAULT 0,
+	charge_now_uah INTEGER NOT NULL DEFAULT 0,
 	capacity_pct INTEGER NOT NULL,
 	status TEXT NOT NULL
 );
@@ -87,6 +90,10 @@ func Open(path string) (*DB, error) {
 		db.Close()
 		return nil, fmt.Errorf("init schema: %w", err)
 	}
+	if err := migrate(db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("migrate: %w", err)
+	}
 	return &DB{db: db}, nil
 }
 
@@ -95,11 +102,31 @@ func (d *DB) Close() error {
 	return d.db.Close()
 }
 
+// migrate applies schema migrations for existing databases.
+func migrate(db *sql.DB) error {
+	// Add charge_now_uah column if it doesn't exist (added in v2).
+	_, err := db.Exec("ALTER TABLE battery_samples ADD COLUMN charge_now_uah INTEGER NOT NULL DEFAULT 0")
+	if err != nil && !isDuplicateColumnError(err) {
+		return fmt.Errorf("add charge_now_uah column: %w", err)
+	}
+	// Add sysfs_power_uw column if it doesn't exist (added in v3).
+	_, err = db.Exec("ALTER TABLE battery_samples ADD COLUMN sysfs_power_uw INTEGER NOT NULL DEFAULT 0")
+	if err != nil && !isDuplicateColumnError(err) {
+		return fmt.Errorf("add sysfs_power_uw column: %w", err)
+	}
+	return nil
+}
+
+// isDuplicateColumnError checks if the error is a "duplicate column" error from SQLite.
+func isDuplicateColumnError(err error) bool {
+	return err != nil && strings.Contains(fmt.Sprintf("%v", err), "duplicate column name")
+}
+
 // InsertBatterySample inserts a battery sample.
 func (d *DB) InsertBatterySample(s collector.BatterySample) error {
 	_, err := d.db.Exec(
-		"INSERT INTO battery_samples (timestamp, voltage_uv, current_ua, power_uw, capacity_pct, status) VALUES (?, ?, ?, ?, ?, ?)",
-		s.Timestamp, s.VoltageUV, s.CurrentUA, s.PowerUW, s.CapacityPct, s.Status,
+		"INSERT INTO battery_samples (timestamp, voltage_uv, current_ua, power_uw, sysfs_power_uw, charge_now_uah, capacity_pct, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+		s.Timestamp, s.VoltageUV, s.CurrentUA, s.PowerUW, s.SysfsPowerUW, s.ChargeNowUAH, s.CapacityPct, s.Status,
 	)
 	return err
 }
@@ -124,9 +151,9 @@ func (d *DB) InsertSleepEvent(s collector.SleepEvent) error {
 
 // LatestBatterySample returns the most recent battery sample.
 func (d *DB) LatestBatterySample() (*collector.BatterySample, error) {
-	row := d.db.QueryRow("SELECT timestamp, voltage_uv, current_ua, power_uw, capacity_pct, status FROM battery_samples ORDER BY timestamp DESC LIMIT 1")
+	row := d.db.QueryRow("SELECT timestamp, voltage_uv, current_ua, power_uw, sysfs_power_uw, charge_now_uah, capacity_pct, status FROM battery_samples ORDER BY timestamp DESC LIMIT 1")
 	var s collector.BatterySample
-	err := row.Scan(&s.Timestamp, &s.VoltageUV, &s.CurrentUA, &s.PowerUW, &s.CapacityPct, &s.Status)
+	err := row.Scan(&s.Timestamp, &s.VoltageUV, &s.CurrentUA, &s.PowerUW, &s.SysfsPowerUW, &s.ChargeNowUAH, &s.CapacityPct, &s.Status)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -153,7 +180,7 @@ func (d *DB) LatestBacklightSample() (*collector.BacklightSample, error) {
 // BatterySamplesInRange returns battery samples within the given time range.
 func (d *DB) BatterySamplesInRange(from, to int64) ([]collector.BatterySample, error) {
 	rows, err := d.db.Query(
-		"SELECT timestamp, voltage_uv, current_ua, power_uw, capacity_pct, status FROM battery_samples WHERE timestamp >= ? AND timestamp <= ? ORDER BY timestamp",
+		"SELECT timestamp, voltage_uv, current_ua, power_uw, sysfs_power_uw, charge_now_uah, capacity_pct, status FROM battery_samples WHERE timestamp >= ? AND timestamp <= ? ORDER BY timestamp",
 		from, to,
 	)
 	if err != nil {
@@ -163,7 +190,7 @@ func (d *DB) BatterySamplesInRange(from, to int64) ([]collector.BatterySample, e
 	var samples []collector.BatterySample
 	for rows.Next() {
 		var s collector.BatterySample
-		if err := rows.Scan(&s.Timestamp, &s.VoltageUV, &s.CurrentUA, &s.PowerUW, &s.CapacityPct, &s.Status); err != nil {
+		if err := rows.Scan(&s.Timestamp, &s.VoltageUV, &s.CurrentUA, &s.PowerUW, &s.SysfsPowerUW, &s.ChargeNowUAH, &s.CapacityPct, &s.Status); err != nil {
 			return nil, err
 		}
 		samples = append(samples, s)

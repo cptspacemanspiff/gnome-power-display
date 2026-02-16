@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/cptspacemanspiff/gnome-power-display/internal/calibration"
+	"github.com/cptspacemanspiff/gnome-power-display/internal/collector"
 )
 
 func main() {
@@ -76,10 +77,14 @@ func main() {
 	fmt.Println("       Initial settling complete.")
 	fmt.Println()
 
+	// Create battery collector for calibration measurements.
+	// Use a 30-second averaging window for charge-delta power calculation.
+	bc := collector.NewBatteryCollector(30)
+
 	// Measure battery update interval.
 	fmt.Println("[2/5] Measuring battery firmware update interval...")
 	fmt.Println("       Rapidly polling power readings to detect value changes...")
-	stats, err := calibration.MeasureUpdateInterval()
+	stats, err := calibration.MeasureUpdateInterval(bc)
 	if err != nil {
 		fmt.Printf("       Warning: could not measure update interval: %v\n", err)
 		fmt.Println("       Using default of 3 seconds")
@@ -95,7 +100,7 @@ func main() {
 	// Measure controller latency (how many update cycles before reading reflects change).
 	fmt.Println("[3/5] Measuring battery controller latency...")
 	fmt.Println("       Setting brightness to 0%%, stabilizing, then stepping to 100%%...")
-	latency, staleCycles, err := calibration.MeasureLatency(stats.Median)
+	latency, staleCycles, err := calibration.MeasureLatency(bc, stats.Median)
 	if err != nil {
 		fmt.Printf("       Warning: could not measure latency: %v\n", err)
 		fmt.Println("       Using default of 2 update cycles")
@@ -133,7 +138,7 @@ func main() {
 
 		// Sample power for 30 seconds and average.
 		fmt.Printf(" sampling %v...", sampleDuration)
-		readings, err := calibration.SamplePower(sampleDuration, 500*time.Millisecond)
+		readings, err := calibration.SamplePower(bc, sampleDuration, 500*time.Millisecond)
 		if err != nil {
 			log.Fatalf("sample power at %d%%: %v", pct, err)
 		}

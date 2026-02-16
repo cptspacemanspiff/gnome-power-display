@@ -178,11 +178,11 @@ func GetBrightness() (current, max int64, err error) {
 }
 
 // SamplePower collects power readings for the given duration at the given interval.
-func SamplePower(duration, interval time.Duration) ([]PowerReading, error) {
+func SamplePower(bc *collector.BatteryCollector, duration, interval time.Duration) ([]PowerReading, error) {
 	var readings []PowerReading
 	deadline := time.Now().Add(duration)
 	for time.Now().Before(deadline) {
-		sample, err := collector.CollectBattery()
+		sample, err := bc.Collect()
 		if err != nil {
 			return nil, fmt.Errorf("collect battery: %w", err)
 		}
@@ -218,25 +218,26 @@ type UpdateIntervalStats struct {
 // MeasureUpdateInterval determines how often the battery firmware/kernel updates
 // the power reading in sysfs. It rapidly polls the power value and measures the
 // time between value changes.
-func MeasureUpdateInterval() (UpdateIntervalStats, error) {
+func MeasureUpdateInterval(bc *collector.BatteryCollector) (UpdateIntervalStats, error) {
 	// Poll rapidly for up to 30 seconds, looking for value transitions.
+	// Uses SysfsPowerUW (raw firmware value) to detect firmware update boundaries.
 	var transitions []time.Time
 	var lastValue int64
 	first := true
 	deadline := time.Now().Add(30 * time.Second)
 
 	for time.Now().Before(deadline) {
-		sample, err := collector.CollectBattery()
+		sample, err := bc.Collect()
 		if err != nil {
 			time.Sleep(10 * time.Millisecond)
 			continue
 		}
 		if first {
-			lastValue = sample.PowerUW
+			lastValue = sample.SysfsPowerUW
 			first = false
-		} else if sample.PowerUW != lastValue {
+		} else if sample.SysfsPowerUW != lastValue {
 			transitions = append(transitions, time.Now())
-			lastValue = sample.PowerUW
+			lastValue = sample.SysfsPowerUW
 			// We need at least a few transitions to get a reliable interval.
 			if len(transitions) >= 6 {
 				break
@@ -277,7 +278,7 @@ func MeasureUpdateInterval() (UpdateIntervalStats, error) {
 // internal averaging the battery controller may do. The updateInterval should come
 // from MeasureUpdateInterval. Returns the latency as a duration and the number of
 // stale update cycles observed.
-func MeasureLatency(updateInterval time.Duration) (latency time.Duration, staleCycles int, err error) {
+func MeasureLatency(bc *collector.BatteryCollector, updateInterval time.Duration) (latency time.Duration, staleCycles int, err error) {
 	// Set brightness to 0% and wait for readings to stabilize.
 	if err := SetBrightness(0); err != nil {
 		return 0, 0, fmt.Errorf("set brightness 0%%: %w", err)
@@ -286,7 +287,7 @@ func MeasureLatency(updateInterval time.Duration) (latency time.Duration, staleC
 
 	// Poll until the rolling stddev drops, indicating the averaging window
 	// has flushed and readings reflect the current state.
-	baselineReadings, err := WaitForStable(updateInterval)
+	baselineReadings, err := WaitForStable(bc, updateInterval)
 	if err != nil {
 		return 0, 0, fmt.Errorf("baseline stabilize: %w", err)
 	}
@@ -307,14 +308,14 @@ func MeasureLatency(updateInterval time.Duration) (latency time.Duration, staleC
 	// Sync to an update boundary: poll until we see a value change, so we know
 	// we're right at the start of a fresh cycle.
 	var lastValue int64
-	sample, _ := collector.CollectBattery()
+	sample, _ := bc.Collect()
 	if sample != nil {
-		lastValue = sample.PowerUW
+		lastValue = sample.SysfsPowerUW
 	}
 	syncDeadline := time.Now().Add(2 * updateInterval)
 	for time.Now().Before(syncDeadline) {
-		s, err := collector.CollectBattery()
-		if err == nil && s.PowerUW != lastValue {
+		s, err := bc.Collect()
+		if err == nil && s.SysfsPowerUW != lastValue {
 			break
 		}
 		time.Sleep(10 * time.Millisecond)
@@ -346,7 +347,7 @@ func MeasureLatency(updateInterval time.Duration) (latency time.Duration, staleC
 			time.Sleep(sleepFor)
 		}
 
-		s, err := collector.CollectBattery()
+		s, err := bc.Collect()
 		if err != nil {
 			log.Printf("  latency: cycle %2d  error: %v", cycle, err)
 			continue
@@ -388,7 +389,7 @@ func MeasureLatency(updateInterval time.Duration) (latency time.Duration, staleC
 // transient is over by splitting the window into quarters and comparing the
 // slope (rate of change) of the first half vs second half. When the slopes
 // match, the transient has passed and we're left with just background drift.
-func WaitForStable(updateInterval time.Duration) ([]PowerReading, error) {
+func WaitForStable(bc *collector.BatteryCollector, updateInterval time.Duration) ([]PowerReading, error) {
 	const windowSize = 20
 	const maxWait = 120 * time.Second
 
@@ -396,7 +397,7 @@ func WaitForStable(updateInterval time.Duration) ([]PowerReading, error) {
 	deadline := time.Now().Add(maxWait)
 
 	for time.Now().Before(deadline) {
-		sample, err := collector.CollectBattery()
+		sample, err := bc.Collect()
 		if err != nil {
 			time.Sleep(updateInterval)
 			continue

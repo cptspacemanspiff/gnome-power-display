@@ -27,8 +27,8 @@ func openTestDB(t *testing.T) *DB {
 func TestBatteryRoundTrip(t *testing.T) {
 	db := openTestDB(t)
 
-	s1 := collector.BatterySample{Timestamp: 10, VoltageUV: 11000000, CurrentUA: 1000000, PowerUW: 1100000, CapacityPct: 80, Status: "Discharging"}
-	s2 := collector.BatterySample{Timestamp: 20, VoltageUV: 12000000, CurrentUA: 1000000, PowerUW: 1200000, CapacityPct: 79, Status: "Discharging"}
+	s1 := collector.BatterySample{Timestamp: 10, VoltageUV: 11000000, CurrentUA: 1000000, PowerUW: 1100000, SysfsPowerUW: 1100000, ChargeNowUAH: 5000000, CapacityPct: 80, Status: "Discharging"}
+	s2 := collector.BatterySample{Timestamp: 20, VoltageUV: 12000000, CurrentUA: 1000000, PowerUW: 1200000, SysfsPowerUW: 1150000, ChargeNowUAH: 4990000, CapacityPct: 79, Status: "Discharging"}
 	if err := db.InsertBatterySample(s1); err != nil {
 		t.Fatalf("InsertBatterySample(s1) error = %v", err)
 	}
