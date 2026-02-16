@@ -7,13 +7,35 @@ on:
       - main
   workflow_dispatch:
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   packages: read
 
 jobs:
-  bazel:
+  changes:
     runs-on: ubuntu-latest
+    outputs:
+      devcontainer: ${{ steps.filter.outputs.devcontainer }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect devcontainer changes
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            devcontainer:
+              - '.devcontainer/**'
+
+  bazel-prebuilt:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.devcontainer != 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,10 +47,27 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Run Bazel checks in devcontainer
+      - name: Run Bazel checks in prebuilt devcontainer
         uses: devcontainers/ci@v0.3
         with:
-          configFile: .devcontainer/devcontainer.ci.json
+          configFile: .devcontainer/ci/devcontainer.json
+          push: never
+          runCmd: |
+            bazel test //...
+            bazel build //cmd/power-monitor-daemon //cmd/power-calibrate
+
+  bazel-from-devcontainer:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.devcontainer == 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Bazel checks in rebuilt devcontainer
+        uses: devcontainers/ci@v0.3
+        with:
+          configFile: .devcontainer/devcontainer.json
           push: never
           runCmd: |
             bazel test //...
