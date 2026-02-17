@@ -57,23 +57,23 @@ func TestService_InvalidTimeRanges(t *testing.T) {
 			},
 		},
 		{
-			name: "GetSleepEvents negative from",
+			name: "GetPowerStateEvents negative from",
 			call: func() *godbus.Error {
-				_, err := svc.GetSleepEvents(-1, 0)
+				_, err := svc.GetPowerStateEvents(-1, 0)
 				return err
 			},
 		},
 		{
-			name: "GetSleepEvents to before from",
+			name: "GetPowerStateEvents to before from",
 			call: func() *godbus.Error {
-				_, err := svc.GetSleepEvents(10, 9)
+				_, err := svc.GetPowerStateEvents(10, 9)
 				return err
 			},
 		},
 		{
-			name: "GetSleepEvents range too large",
+			name: "GetPowerStateEvents range too large",
 			call: func() *godbus.Error {
-				_, err := svc.GetSleepEvents(0, 86400*366)
+				_, err := svc.GetPowerStateEvents(0, 86400*366)
 				return err
 			},
 		},
@@ -118,8 +118,8 @@ func TestService_SuccessJSONShapes(t *testing.T) {
 	if err := db.InsertBacklightSample(collector.BacklightSample{Timestamp: 100, Brightness: 200, MaxBrightness: 500}); err != nil {
 		t.Fatalf("InsertBacklightSample() error = %v", err)
 	}
-	if err := db.InsertSleepEvent(collector.SleepEvent{SleepTime: 90, WakeTime: 95, Type: "suspend"}); err != nil {
-		t.Fatalf("InsertSleepEvent() error = %v", err)
+	if _, err := db.InsertPowerStateEvent(collector.PowerStateEvent{StartTime: 90, EndTime: 95, Type: "suspend", SuspendSecs: 5}); err != nil {
+		t.Fatalf("InsertPowerStateEvent() error = %v", err)
 	}
 	if err := db.InsertProcessSamples([]collector.ProcessSample{{Timestamp: 100, PID: 1, Comm: "a", Cmdline: "a", CPUTicksDelta: 10, LastCPU: 0}}); err != nil {
 		t.Fatalf("InsertProcessSamples() error = %v", err)
@@ -158,9 +158,9 @@ func TestService_SuccessJSONShapes(t *testing.T) {
 		t.Fatalf("history JSON missing key %q: %s", "backlight", historyJSON)
 	}
 
-	sleepJSON, dbusErr := svc.GetSleepEvents(0, 200)
+	sleepJSON, dbusErr := svc.GetPowerStateEvents(0, 200)
 	if dbusErr != nil {
-		t.Fatalf("GetSleepEvents() error = %v", dbusErr)
+		t.Fatalf("GetPowerStateEvents() error = %v", dbusErr)
 	}
 	var sleepArr []map[string]any
 	if err := json.Unmarshal([]byte(sleepJSON), &sleepArr); err != nil {

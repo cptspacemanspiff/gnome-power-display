@@ -27,7 +27,7 @@ const PowerMonitorProxyIface = `
       <arg direction="in" type="x" name="to_epoch"/>
       <arg direction="out" type="s" name="json"/>
     </method>
-    <method name="GetSleepEvents">
+    <method name="GetPowerStateEvents">
       <arg direction="in" type="x" name="from_epoch"/>
       <arg direction="in" type="x" name="to_epoch"/>
       <arg direction="out" type="s" name="json"/>
@@ -284,7 +284,7 @@ class PowerMonitorIndicator extends PanelMenu.Button {
             this._batteryGraphArea.queue_repaint();
             this._energyGraphArea.queue_repaint();
         });
-        this._proxy.GetSleepEventsRemote(from, to, (result, error) => {
+        this._proxy.GetPowerStateEventsRemote(from, to, (result, error) => {
             if (error) return;
             try { this._sleepData = JSON.parse(result[0]); } catch (e) { /* */ }
             this._batteryGraphArea.queue_repaint();

@@ -32,14 +32,6 @@ CREATE TABLE IF NOT EXISTS backlight_samples (
 );
 CREATE INDEX IF NOT EXISTS idx_backlight_ts ON backlight_samples(timestamp);
 
-CREATE TABLE IF NOT EXISTS sleep_events (
-	id INTEGER PRIMARY KEY AUTOINCREMENT,
-	sleep_time INTEGER NOT NULL,
-	wake_time INTEGER NOT NULL,
-	type TEXT NOT NULL DEFAULT 'unknown'
-);
-CREATE INDEX IF NOT EXISTS idx_sleep_ts ON sleep_events(sleep_time);
-
 CREATE TABLE IF NOT EXISTS power_state_events (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
 	start_time INTEGER NOT NULL,
@@ -136,15 +128,6 @@ func (d *DB) InsertBacklightSample(s collector.BacklightSample) error {
 	_, err := d.db.Exec(
 		"INSERT INTO backlight_samples (timestamp, brightness, max_brightness) VALUES (?, ?, ?)",
 		s.Timestamp, s.Brightness, s.MaxBrightness,
-	)
-	return err
-}
-
-// InsertSleepEvent inserts a sleep event.
-func (d *DB) InsertSleepEvent(s collector.SleepEvent) error {
-	_, err := d.db.Exec(
-		"INSERT INTO sleep_events (sleep_time, wake_time, type) VALUES (?, ?, ?)",
-		s.SleepTime, s.WakeTime, s.Type,
 	)
 	return err
 }
@@ -353,27 +336,3 @@ func (d *DB) PowerStateEventsInRange(from, to int64) ([]collector.PowerStateEven
 	return events, rows.Err()
 }
 
-// SleepEventsInRange returns sleep events from both the legacy sleep_events table
-// and the new power_state_events table, unified into SleepEvent format.
-func (d *DB) SleepEventsInRange(from, to int64) ([]collector.SleepEvent, error) {
-	rows, err := d.db.Query(
-		`SELECT sleep_time, wake_time, type FROM sleep_events WHERE wake_time >= ? AND sleep_time <= ?
-		 UNION ALL
-		 SELECT start_time, end_time, type FROM power_state_events WHERE end_time >= ? AND start_time <= ?
-		 ORDER BY 1`,
-		from, to, from, to,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var events []collector.SleepEvent
-	for rows.Next() {
-		var e collector.SleepEvent
-		if err := rows.Scan(&e.SleepTime, &e.WakeTime, &e.Type); err != nil {
-			return nil, err
-		}
-		events = append(events, e)
-	}
-	return events, rows.Err()
-}

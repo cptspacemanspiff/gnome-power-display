@@ -20,13 +20,6 @@ type BacklightSample struct {
 	MaxBrightness int64 `json:"max_brightness"`
 }
 
-// SleepEvent records a sleep/wake cycle.
-type SleepEvent struct {
-	SleepTime int64  `json:"sleep_time"`
-	WakeTime  int64  `json:"wake_time"`
-	Type      string `json:"type"` // "suspend", "hibernate", or "unknown"
-}
-
 // PowerStateEvent records a power state transition (suspend, hibernate, shutdown, etc.).
 type PowerStateEvent struct {
 	StartTime     int64  `json:"start_time"`

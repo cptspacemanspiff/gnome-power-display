@@ -27,7 +27,7 @@ const introspectXML = `
       <arg direction="in" type="x" name="to_epoch"/>
       <arg direction="out" type="s" name="json"/>
     </method>
-    <method name="GetSleepEvents">
+    <method name="GetPowerStateEvents">
       <arg direction="in" type="x" name="from_epoch"/>
       <arg direction="in" type="x" name="to_epoch"/>
       <arg direction="out" type="s" name="json"/>
@@ -117,14 +117,14 @@ func (s *Service) GetHistory(fromEpoch, toEpoch int64) (string, *godbus.Error) {
 	return string(data), nil
 }
 
-// GetSleepEvents returns sleep events in a time range as JSON.
-func (s *Service) GetSleepEvents(fromEpoch, toEpoch int64) (string, *godbus.Error) {
+// GetPowerStateEvents returns power state events in a time range as JSON.
+func (s *Service) GetPowerStateEvents(fromEpoch, toEpoch int64) (string, *godbus.Error) {
 	if fromEpoch < 0 || toEpoch < fromEpoch || (toEpoch-fromEpoch) > 86400*365 {
 		return "", godbus.MakeFailedError(fmt.Errorf("invalid time range: from=%d to=%d", fromEpoch, toEpoch))
 	}
-	events, err := s.store.SleepEventsInRange(fromEpoch, toEpoch)
+	events, err := s.store.PowerStateEventsInRange(fromEpoch, toEpoch)
 	if err != nil {
-		return "", godbus.MakeFailedError(fmt.Errorf("query sleep events: %w", err))
+		return "", godbus.MakeFailedError(fmt.Errorf("query power state events: %w", err))
 	}
 	data, err := json.Marshal(events)
 	if err != nil {

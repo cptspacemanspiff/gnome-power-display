@@ -67,7 +67,7 @@ Object path: `/org/gnome/PowerMonitor`
 Methods:
 - `GetCurrentStats()` → JSON with latest battery and backlight samples
 - `GetHistory(from_epoch, to_epoch)` → JSON with battery and backlight samples in time range
-- `GetSleepEvents(from_epoch, to_epoch)` → JSON with sleep/hibernate/shutdown events
+- `GetPowerStateEvents(from_epoch, to_epoch)` → JSON with power state events (suspend/hibernate/shutdown)
 - `GetProcessHistory(from_epoch, to_epoch)` → JSON with process CPU usage and CPU frequency samples
 
 All time range methods validate inputs (non-negative, from ≤ to, range ≤ 1 year) to prevent DoS attacks. Database errors are properly propagated to clients as D-Bus errors.
@@ -110,7 +110,7 @@ Wall-clock time is used for sleep duration calculation (Go's monotonic clock sto
 
 ### Data Cleanup
 
-The daemon automatically prunes data older than the configured retention period (default 30 days) on startup and every cleanup interval (default 24 hours). Cleanup runs in a transaction across all tables (battery_samples, backlight_samples, sleep_events, power_state_events, process_samples, cpu_freq_samples).
+The daemon automatically prunes data older than the configured retention period (default 30 days) on startup and every cleanup interval (default 24 hours). Cleanup runs in a transaction across all tables (battery_samples, backlight_samples, power_state_events, process_samples, cpu_freq_samples).
 
 ## GNOME Extension
 

@@ -43,14 +43,6 @@ func TestDeleteOlderThan(t *testing.T) {
 		}
 	}
 
-	// sleep_events
-	for _, ts := range []int64{oldTs, cutoffTs, newTs} {
-		err := db.InsertSleepEvent(collector.SleepEvent{SleepTime: ts, WakeTime: ts + 10, Type: "suspend"})
-		if err != nil {
-			t.Fatalf("InsertSleepEvent(ts=%d): %v", ts, err)
-		}
-	}
-
 	// power_state_events
 	for _, ts := range []int64{oldTs, cutoffTs, newTs} {
 		_, err := db.InsertPowerStateEvent(collector.PowerStateEvent{StartTime: ts, EndTime: ts + 10, Type: "suspend", SuspendSecs: 10})
@@ -83,14 +75,13 @@ func TestDeleteOlderThan(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DeleteOlderThan() error = %v", err)
 	}
-	if deleted != 6 {
-		t.Fatalf("DeleteOlderThan() deleted = %d, want 6 (one old row per table)", deleted)
+	if deleted != 5 {
+		t.Fatalf("DeleteOlderThan() deleted = %d, want 5 (one old row per table)", deleted)
 	}
 
 	for _, table := range []string{
 		"battery_samples",
 		"backlight_samples",
-		"sleep_events",
 		"power_state_events",
 		"process_samples",
 		"cpu_freq_samples",

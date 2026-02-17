@@ -17,7 +17,6 @@ func (d *DB) DeleteOlderThan(before int64) (int64, error) {
 	}{
 		{"battery_samples", "timestamp"},
 		{"backlight_samples", "timestamp"},
-		{"sleep_events", "sleep_time"},
 		{"power_state_events", "start_time"},
 		{"process_samples", "timestamp"},
 		{"cpu_freq_samples", "timestamp"},

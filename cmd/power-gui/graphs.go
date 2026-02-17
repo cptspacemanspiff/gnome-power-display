@@ -47,7 +47,7 @@ func (c rgba) set(cr *cairo.Context) {
 type batteryGraph struct {
 	area    *gtk.DrawingArea
 	battery []collector.BatterySample
-	sleep   []collector.SleepEvent
+	sleep   []collector.PowerStateEvent
 	from    time.Time
 	to      time.Time
 }
@@ -61,7 +61,7 @@ func newBatteryGraph() *batteryGraph {
 	return g
 }
 
-func (g *batteryGraph) SetData(battery []collector.BatterySample, sleep []collector.SleepEvent, from, to time.Time) {
+func (g *batteryGraph) SetData(battery []collector.BatterySample, sleep []collector.PowerStateEvent, from, to time.Time) {
 	g.battery = battery
 	g.sleep = sleep
 	g.from = from
@@ -108,8 +108,8 @@ func (g *batteryGraph) draw(_ *gtk.DrawingArea, cr *cairo.Context, w, h int) {
 
 	// Sleep regions
 	for _, ev := range g.sleep {
-		x1 := float64(padLeft) + float64(ev.SleepTime-fromUnix)/timeSpan*float64(plotW)
-		x2 := float64(padLeft) + float64(ev.WakeTime-fromUnix)/timeSpan*float64(plotW)
+		x1 := float64(padLeft) + float64(ev.StartTime-fromUnix)/timeSpan*float64(plotW)
+		x2 := float64(padLeft) + float64(ev.EndTime-fromUnix)/timeSpan*float64(plotW)
 		x1 = math.Max(x1, float64(padLeft))
 		x2 = math.Min(x2, float64(padLeft+plotW))
 		colSleepBg.set(cr)
@@ -193,7 +193,7 @@ func (g *batteryGraph) draw(_ *gtk.DrawingArea, cr *cairo.Context, w, h int) {
 type energyGraph struct {
 	area    *gtk.DrawingArea
 	battery []collector.BatterySample
-	sleep   []collector.SleepEvent
+	sleep   []collector.PowerStateEvent
 	from    time.Time
 	to      time.Time
 }
@@ -207,7 +207,7 @@ func newEnergyGraph() *energyGraph {
 	return g
 }
 
-func (g *energyGraph) SetData(battery []collector.BatterySample, sleep []collector.SleepEvent, from, to time.Time) {
+func (g *energyGraph) SetData(battery []collector.BatterySample, sleep []collector.PowerStateEvent, from, to time.Time) {
 	g.battery = battery
 	g.sleep = sleep
 	g.from = from
@@ -264,8 +264,8 @@ func (g *energyGraph) draw(_ *gtk.DrawingArea, cr *cairo.Context, w, h int) {
 
 	// Sleep regions
 	for _, ev := range g.sleep {
-		x1 := float64(padLeft) + float64(ev.SleepTime-fromUnix)/timeSpan*float64(plotW)
-		x2 := float64(padLeft) + float64(ev.WakeTime-fromUnix)/timeSpan*float64(plotW)
+		x1 := float64(padLeft) + float64(ev.StartTime-fromUnix)/timeSpan*float64(plotW)
+		x2 := float64(padLeft) + float64(ev.EndTime-fromUnix)/timeSpan*float64(plotW)
 		x1 = math.Max(x1, float64(padLeft))
 		x2 = math.Min(x2, float64(padLeft+plotW))
 		colSleepBg.set(cr)

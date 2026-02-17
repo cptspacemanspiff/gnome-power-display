@@ -12,12 +12,25 @@ import (
 )
 
 var (
-	client       *dbusClient
-	stats        *statsBar
-	battGraph    *batteryGraph
-	energyGr     *energyGraph
+	client        *dbusClient
+	stats         *statsBar
+	battGraph     *batteryGraph
+	energyGr      *energyGraph
 	selectedRange int = 3 // default 6h
 )
+
+type sidebarEntry struct {
+	id       string
+	title    string
+	iconName string
+}
+
+var sidebarEntries = []sidebarEntry{
+	{"overview", "Overview", "utilities-system-monitor-symbolic"},
+	{"battery", "Battery Status", "battery-full-symbolic"},
+	{"calibration", "Calibration", "preferences-color-symbolic"},
+	{"settings", "Settings", "preferences-system-symbolic"},
+}
 
 func main() {
 	app := adw.NewApplication("org.gnome.PowerMonitorGUI", gio.ApplicationFlagsNone)
@@ -40,13 +53,19 @@ func activate(app *adw.Application) {
 
 	loadCSS()
 
+	// Content stack
+	stack := gtk.NewStack()
+	stack.SetTransitionType(gtk.StackTransitionTypeCrossfade)
+	stack.SetHExpand(true)
+	stack.SetVExpand(true)
+
 	// Build overview page
 	stats = newStatsBar()
 	battGraph = newBatteryGraph()
 	energyGr = newEnergyGraph()
 
-	battGraph.area.SetSizeRequest(780, 220)
-	energyGr.area.SetSizeRequest(780, 220)
+	battGraph.area.SetSizeRequest(600, 220)
+	energyGr.area.SetSizeRequest(600, 220)
 
 	timeBar := newTimeRangeBar(selectedRange, func(idx int) {
 		selectedRange = idx
@@ -65,43 +84,82 @@ func activate(app *adw.Application) {
 	overviewBox.Append(timeBar.container)
 	overviewBox.Append(graphBox)
 
+	stack.AddNamed(overviewBox, "overview")
+
 	// Placeholder pages
 	batteryPage := adw.NewStatusPage()
 	batteryPage.SetTitle("Battery Status")
 	batteryPage.SetDescription("Coming Soon")
 	batteryPage.SetIconName("battery-full-symbolic")
+	stack.AddNamed(batteryPage, "battery")
 
 	calibrationPage := adw.NewStatusPage()
 	calibrationPage.SetTitle("Calibration")
 	calibrationPage.SetDescription("Coming Soon")
 	calibrationPage.SetIconName("preferences-color-symbolic")
+	stack.AddNamed(calibrationPage, "calibration")
 
 	settingsPage := adw.NewStatusPage()
 	settingsPage.SetTitle("Settings")
 	settingsPage.SetDescription("Coming Soon")
 	settingsPage.SetIconName("preferences-system-symbolic")
+	stack.AddNamed(settingsPage, "settings")
 
-	// Stack with pages
-	stack := gtk.NewStack()
-	stack.SetTransitionType(gtk.StackTransitionTypeCrossfade)
-	stack.AddTitled(overviewBox, "overview", "Overview")
-	stack.AddTitled(batteryPage, "battery", "Battery Status")
-	stack.AddTitled(calibrationPage, "calibration", "Calibration")
-	stack.AddTitled(settingsPage, "settings", "Settings")
+	// Sidebar
+	sidebar := gtk.NewListBox()
+	sidebar.SetSelectionMode(gtk.SelectionBrowse)
+	sidebar.AddCSSClass("navigation-sidebar")
 
-	// Header bar with stack switcher
-	switcher := gtk.NewStackSwitcher()
-	switcher.SetStack(stack)
+	for _, entry := range sidebarEntries {
+		row := newSidebarRow(entry.iconName, entry.title)
+		sidebar.Append(row)
+	}
 
+	sidebar.ConnectRowSelected(func(row *gtk.ListBoxRow) {
+		if row == nil {
+			return
+		}
+		idx := row.Index()
+		if idx >= 0 && idx < len(sidebarEntries) {
+			stack.SetVisibleChildName(sidebarEntries[idx].id)
+		}
+	})
+
+	// Select first row
+	if first := sidebar.RowAtIndex(0); first != nil {
+		sidebar.SelectRow(first)
+	}
+
+	sidebarScroll := gtk.NewScrolledWindow()
+	sidebarScroll.SetPolicy(gtk.PolicyNever, gtk.PolicyAutomatic)
+	sidebarScroll.SetChild(sidebar)
+	sidebarScroll.SetSizeRequest(200, -1)
+
+	// Header bar (clean, no switcher)
 	headerBar := adw.NewHeaderBar()
-	headerBar.SetTitleWidget(switcher)
+	headerBar.SetTitleWidget(gtk.NewLabel("Power Monitor"))
 
-	// Main layout
-	mainBox := gtk.NewBox(gtk.OrientationVertical, 0)
-	mainBox.Append(headerBar)
-	mainBox.Append(stack)
+	// Content area with header
+	contentBox := gtk.NewBox(gtk.OrientationVertical, 0)
+	contentBox.Append(headerBar)
 
-	win.SetContent(mainBox)
+	// Horizontal split: sidebar | content
+	splitBox := gtk.NewBox(gtk.OrientationHorizontal, 0)
+	splitBox.Append(sidebarScroll)
+
+	separator := gtk.NewSeparator(gtk.OrientationVertical)
+	splitBox.Append(separator)
+
+	contentScroll := gtk.NewScrolledWindow()
+	contentScroll.SetPolicy(gtk.PolicyNever, gtk.PolicyAutomatic)
+	contentScroll.SetChild(stack)
+	contentScroll.SetHExpand(true)
+	contentScroll.SetVExpand(true)
+	splitBox.Append(contentScroll)
+
+	contentBox.Append(splitBox)
+
+	win.SetContent(contentBox)
 	win.Show()
 
 	// Initial data load
@@ -112,6 +170,19 @@ func activate(app *adw.Application) {
 		refreshData()
 		return true
 	})
+}
+
+func newSidebarRow(iconName, label string) *gtk.Box {
+	icon := gtk.NewImageFromIconName(iconName)
+
+	text := gtk.NewLabel(label)
+	text.SetXAlign(0)
+	text.SetHExpand(true)
+
+	row := gtk.NewBox(gtk.OrientationHorizontal, 10)
+	row.Append(icon)
+	row.Append(text)
+	return row
 }
 
 func refreshData() {
@@ -128,7 +199,7 @@ func refreshData() {
 		return
 	}
 
-	sleep, _ := client.GetSleepEvents(from, now)
+	sleep, _ := client.GetPowerStateEvents(from, now)
 
 	battGraph.SetData(history.Battery, sleep, from, now)
 	energyGr.SetData(history.Battery, sleep, from, now)

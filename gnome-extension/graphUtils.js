@@ -39,7 +39,7 @@ export function bucketSeconds(rangeSeconds) {
 export function overlapsSleep(sleepData, start, end) {
     if (!sleepData) return false;
     for (const evt of sleepData) {
-        if (start < evt.wake_time && end > evt.sleep_time)
+        if (start < evt.end_time && end > evt.start_time)
             return true;
     }
     return false;
@@ -197,8 +197,8 @@ export function drawTimeAxis(cr, gw, gh, from, rangeSeconds) {
 export function drawSleepRegions(cr, gw, gh, from, rangeSeconds, sleepData, bucketSec) {
     if (!sleepData || sleepData.length === 0) return;
     for (const evt of sleepData) {
-        let sleepStart = evt.sleep_time;
-        let sleepEnd = evt.wake_time;
+        let sleepStart = evt.start_time;
+        let sleepEnd = evt.end_time;
         if (bucketSec) {
             sleepStart = Math.floor((sleepStart - from) / bucketSec) * bucketSec + from;
             sleepEnd = Math.ceil((sleepEnd - from) / bucketSec) * bucketSec + from;

@@ -66,13 +66,13 @@ func (c *dbusClient) GetHistory(from, to time.Time) (*historyData, error) {
 	return &data, nil
 }
 
-func (c *dbusClient) GetSleepEvents(from, to time.Time) ([]collector.SleepEvent, error) {
+func (c *dbusClient) GetPowerStateEvents(from, to time.Time) ([]collector.PowerStateEvent, error) {
 	var jsonStr string
-	err := c.obj.Call(dbusIface+".GetSleepEvents", 0, from.Unix(), to.Unix()).Store(&jsonStr)
+	err := c.obj.Call(dbusIface+".GetPowerStateEvents", 0, from.Unix(), to.Unix()).Store(&jsonStr)
 	if err != nil {
 		return nil, err
 	}
-	var events []collector.SleepEvent
+	var events []collector.PowerStateEvent
 	if err := json.Unmarshal([]byte(jsonStr), &events); err != nil {
 		return nil, err
 	}

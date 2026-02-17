@@ -154,33 +154,3 @@ func TestInsertPowerStateEvent_DeduplicatesByStartTime(t *testing.T) {
 	}
 }
 
-func TestSleepEventsInRange_UnionSemantics(t *testing.T) {
-	db := openTestDB(t)
-
-	if err := db.InsertSleepEvent(collector.SleepEvent{SleepTime: 100, WakeTime: 110, Type: "suspend"}); err != nil {
-		t.Fatalf("InsertSleepEvent(legacy) error = %v", err)
-	}
-	if err := db.InsertSleepEvent(collector.SleepEvent{SleepTime: 10, WakeTime: 20, Type: "suspend"}); err != nil {
-		t.Fatalf("InsertSleepEvent(outside) error = %v", err)
-	}
-	if _, err := db.InsertPowerStateEvent(collector.PowerStateEvent{StartTime: 120, EndTime: 130, Type: "hibernate", HibernateSecs: 10}); err != nil {
-		t.Fatalf("InsertPowerStateEvent() error = %v", err)
-	}
-	if _, err := db.InsertPowerStateEvent(collector.PowerStateEvent{StartTime: 300, EndTime: 310, Type: "shutdown"}); err != nil {
-		t.Fatalf("InsertPowerStateEvent(outside) error = %v", err)
-	}
-
-	events, err := db.SleepEventsInRange(105, 125)
-	if err != nil {
-		t.Fatalf("SleepEventsInRange() error = %v", err)
-	}
-	if len(events) != 2 {
-		t.Fatalf("SleepEventsInRange() len = %d, want 2", len(events))
-	}
-	if events[0].SleepTime != 100 || events[0].Type != "suspend" {
-		t.Fatalf("events[0] = %#v, want legacy event first", events[0])
-	}
-	if events[1].SleepTime != 120 || events[1].Type != "hibernate" {
-		t.Fatalf("events[1] = %#v, want power_state event second", events[1])
-	}
-}
