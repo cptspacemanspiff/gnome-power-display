@@ -1,5 +1,17 @@
-load("@gazelle//:def.bzl", "gazelle")
+load("@gazelle//:def.bzl", "gazelle", "gazelle_binary")
+
+gazelle_binary(
+    name = "gazelle_bin",
+    languages = [
+        "@gazelle//language/go",
+        "@gazelle//language/proto",
+        # Enable this only if you added bazel_skylib_gazelle_plugin above:
+        "@bazel_skylib_gazelle_plugin//bzl",
+    ],
+)
 
 gazelle(
     name = "gazelle",
+    command = "fix",
+    gazelle = ":gazelle_bin",
 )

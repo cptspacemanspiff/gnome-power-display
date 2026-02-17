@@ -13,7 +13,7 @@ go_library(
     importpath = "github.com/cptspacemanspiff/gnome-power-display/internal/collector",
     visibility = ["//:__subpackages__"],
     deps = [
-        "@com_github_godbus_dbus_v5//:dbus",
+        "@com_github_godbus_dbus_v5//:go_default_library",
     ],
 )
 

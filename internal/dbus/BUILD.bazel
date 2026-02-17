@@ -7,8 +7,8 @@ go_library(
     visibility = ["//:__subpackages__"],
     deps = [
         "//internal/storage",
-        "@com_github_godbus_dbus_v5//:dbus",
-        "@com_github_godbus_dbus_v5//introspect",
+        "@com_github_godbus_dbus_v5//:go_default_library",
+        "@com_github_godbus_dbus_v5//introspect:go_default_library",
     ],
 )
 
@@ -16,5 +16,9 @@ go_test(
     name = "dbus_test",
     srcs = ["service_test.go"],
     embed = [":dbus"],
-    deps = ["//internal/collector"],
+    deps = [
+        "//internal/collector",
+        "//internal/storage",
+        "@com_github_godbus_dbus_v5//:go_default_library",
+    ],
 )

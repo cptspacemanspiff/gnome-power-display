@@ -1,4 +1,4 @@
-load("@rules_go//go:def.bzl", "go_library")
+load("@rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "calibration",
@@ -8,4 +8,11 @@ go_library(
     deps = [
         "//internal/collector",
     ],
+)
+
+go_test(
+    name = "calibration_test",
+    srcs = ["calibration_test.go"],
+    embed = [":calibration"],
+    deps = ["//internal/collector"],
 )

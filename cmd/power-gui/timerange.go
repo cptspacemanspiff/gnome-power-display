@@ -1,14 +1,9 @@
 package main
 
 import (
-	"image/color"
 	"time"
 
-	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/canvas"
-	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/layout"
-	"fyne.io/fyne/v2/widget"
+	"github.com/diamondburned/gotk4/pkg/gtk/v4"
 )
 
 type timeRange struct {
@@ -25,19 +20,37 @@ var timeRanges = []timeRange{
 	{"7d", 7 * 24 * time.Hour},
 }
 
-func newTimeRangeBar(selected int, onSelect func(int)) fyne.CanvasObject {
-	buttons := make([]fyne.CanvasObject, len(timeRanges))
+type timeRangeBar struct {
+	container *gtk.Box
+	buttons   []*gtk.ToggleButton
+}
+
+func newTimeRangeBar(selected int, onSelect func(int)) *timeRangeBar {
+	bar := &timeRangeBar{}
+	bar.container = gtk.NewBox(gtk.OrientationHorizontal, 4)
+	bar.container.AddCSSClass("time-range-bar")
+
+	bar.buttons = make([]*gtk.ToggleButton, len(timeRanges))
 	for i, tr := range timeRanges {
 		idx := i
-		btn := widget.NewButton(tr.Label, func() {
+		btn := gtk.NewToggleButtonWithLabel(tr.Label)
+		btn.SetActive(i == selected)
+		btn.ConnectToggled(func() {
+			if !btn.Active() {
+				return
+			}
+			// Deactivate other buttons
+			for j, other := range bar.buttons {
+				if j != idx {
+					other.SetActive(false)
+				}
+			}
 			onSelect(idx)
+			refreshData()
 		})
-		if i == selected {
-			btn.Importance = widget.HighImportance
-		}
-		buttons[idx] = btn
+		bar.buttons[i] = btn
+		bar.container.Append(btn)
 	}
-	row := container.New(layout.NewHBoxLayout(), buttons...)
-	bg := canvas.NewRectangle(color.NRGBA{R: 30, G: 30, B: 30, A: 230})
-	return container.NewStack(bg, container.NewPadded(row))
+
+	return bar
 }

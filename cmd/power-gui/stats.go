@@ -2,53 +2,50 @@ package main
 
 import (
 	"fmt"
-	"image/color"
 
-	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/canvas"
-	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/layout"
-)
-
-var (
-	colorGreenAccent = color.NRGBA{R: 77, G: 191, B: 102, A: 255}
-	colorWhiteLabel  = color.NRGBA{R: 200, G: 200, B: 200, A: 255}
+	"github.com/diamondburned/gotk4/pkg/gtk/v4"
 )
 
 type statsBar struct {
-	powerLabel   *canvas.Text
-	batteryLabel *canvas.Text
-	statusLabel  *canvas.Text
-	brightLabel  *canvas.Text
-	container    fyne.CanvasObject
+	powerVal   *gtk.Label
+	batteryVal *gtk.Label
+	statusVal  *gtk.Label
+	brightVal  *gtk.Label
+	container  *gtk.Box
 }
 
 func newStatsBar() *statsBar {
-	s := &statsBar{
-		powerLabel:   newStatText("-- W"),
-		batteryLabel: newStatText("--%"),
-		statusLabel:  newStatText("--"),
-		brightLabel:  newStatText("--%"),
+	s := &statsBar{}
+
+	s.powerVal = gtk.NewLabel("-- W")
+	s.powerVal.AddCSSClass("stat-value")
+
+	s.batteryVal = gtk.NewLabel("--%")
+	s.batteryVal.AddCSSClass("stat-value")
+
+	s.statusVal = gtk.NewLabel("--")
+	s.statusVal.AddCSSClass("stat-value")
+
+	s.brightVal = gtk.NewLabel("--%")
+	s.brightVal.AddCSSClass("stat-value")
+
+	mkGroup := func(title string, val *gtk.Label) *gtk.Box {
+		titleLabel := gtk.NewLabel(title)
+		titleLabel.AddCSSClass("stat-title")
+		box := gtk.NewBox(gtk.OrientationVertical, 2)
+		box.Append(titleLabel)
+		box.Append(val)
+		return box
 	}
 
-	powerTitle := newLabelText("Power")
-	batteryTitle := newLabelText("Battery")
-	statusTitle := newLabelText("Status")
-	brightTitle := newLabelText("Brightness")
+	s.container = gtk.NewBox(gtk.OrientationHorizontal, 0)
+	s.container.AddCSSClass("stats-bar")
+	s.container.SetHomogeneous(true)
+	s.container.Append(mkGroup("Power", s.powerVal))
+	s.container.Append(mkGroup("Battery", s.batteryVal))
+	s.container.Append(mkGroup("Status", s.statusVal))
+	s.container.Append(mkGroup("Brightness", s.brightVal))
 
-	bg := canvas.NewRectangle(accentBgColor())
-
-	row := container.New(layout.NewHBoxLayout(),
-		container.NewVBox(powerTitle, s.powerLabel),
-		layout.NewSpacer(),
-		container.NewVBox(batteryTitle, s.batteryLabel),
-		layout.NewSpacer(),
-		container.NewVBox(statusTitle, s.statusLabel),
-		layout.NewSpacer(),
-		container.NewVBox(brightTitle, s.brightLabel),
-	)
-
-	s.container = container.NewStack(bg, container.NewPadded(row))
 	return s
 }
 
@@ -58,29 +55,12 @@ func (s *statsBar) Update(stats *currentStats) {
 	}
 	if stats.Battery != nil {
 		watts := float64(stats.Battery.PowerUW) / 1e6
-		s.powerLabel.Text = fmt.Sprintf("%.1f W", watts)
-		s.batteryLabel.Text = fmt.Sprintf("%d%%", stats.Battery.CapacityPct)
-		s.statusLabel.Text = stats.Battery.Status
+		s.powerVal.SetLabel(fmt.Sprintf("%.1f W", watts))
+		s.batteryVal.SetLabel(fmt.Sprintf("%d%%", stats.Battery.CapacityPct))
+		s.statusVal.SetLabel(stats.Battery.Status)
 	}
 	if stats.Backlight != nil && stats.Backlight.MaxBrightness > 0 {
 		pct := float64(stats.Backlight.Brightness) * 100 / float64(stats.Backlight.MaxBrightness)
-		s.brightLabel.Text = fmt.Sprintf("%.0f%%", pct)
+		s.brightVal.SetLabel(fmt.Sprintf("%.0f%%", pct))
 	}
-	s.powerLabel.Refresh()
-	s.batteryLabel.Refresh()
-	s.statusLabel.Refresh()
-	s.brightLabel.Refresh()
-}
-
-func newStatText(text string) *canvas.Text {
-	t := canvas.NewText(text, colorGreenAccent)
-	t.TextSize = 18
-	t.TextStyle = fyne.TextStyle{Bold: true}
-	return t
-}
-
-func newLabelText(text string) *canvas.Text {
-	t := canvas.NewText(text, colorWhiteLabel)
-	t.TextSize = 12
-	return t
 }

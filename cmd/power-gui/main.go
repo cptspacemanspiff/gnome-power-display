@@ -2,86 +2,121 @@ package main
 
 import (
 	"log"
+	"os"
 	"time"
 
-	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/app"
-	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/layout"
-	"fyne.io/fyne/v2/widget"
-	xtheme "fyne.io/x/fyne/theme"
+	"github.com/diamondburned/gotk4-adwaita/pkg/adw"
+	"github.com/diamondburned/gotk4/pkg/gio/v2"
+	"github.com/diamondburned/gotk4/pkg/glib/v2"
+	"github.com/diamondburned/gotk4/pkg/gtk/v4"
+)
+
+var (
+	client       *dbusClient
+	stats        *statsBar
+	battGraph    *batteryGraph
+	energyGr     *energyGraph
+	selectedRange int = 3 // default 6h
 )
 
 func main() {
-	a := app.NewWithID("org.gnome.PowerMonitorGUI")
-	a.Settings().SetTheme(xtheme.AdwaitaTheme())
+	app := adw.NewApplication("org.gnome.PowerMonitorGUI", gio.ApplicationFlagsNone)
+	app.ConnectActivate(func() { activate(app) })
+	if code := app.Run(os.Args); code > 0 {
+		os.Exit(code)
+	}
+}
 
-	client, err := newDBusClient()
+func activate(app *adw.Application) {
+	var err error
+	client, err = newDBusClient()
 	if err != nil {
 		log.Fatalf("Failed to connect to D-Bus: %v", err)
 	}
 
-	w := a.NewWindow("Power Monitor")
-	w.Resize(fyne.NewSize(900, 600))
+	win := adw.NewApplicationWindow(&app.Application)
+	win.SetTitle("Power Monitor")
+	win.SetDefaultSize(900, 600)
 
-	stats := newStatsBar()
-	battGraph := newBatteryGraph()
-	energyGr := newEnergyGraph()
+	loadCSS()
 
-	selectedRange := 3 // default 6h
+	// Build overview page
+	stats = newStatsBar()
+	battGraph = newBatteryGraph()
+	energyGr = newEnergyGraph()
 
-	// Build overview page content
-	var timeBar fyne.CanvasObject
-	graphs := container.New(layout.NewGridWrapLayout(fyne.NewSize(780, 220)), battGraph, energyGr)
-	overviewContent := container.NewVBox(stats.container, nil, graphs)
+	battGraph.area.SetSizeRequest(780, 220)
+	energyGr.area.SetSizeRequest(780, 220)
 
-	rebuildTimeBar := func() {}
-	rebuildTimeBar = func() {
-		timeBar = newTimeRangeBar(selectedRange, func(idx int) {
-			selectedRange = idx
-			rebuildTimeBar()
-			refreshData(client, stats, battGraph, energyGr, selectedRange)
-		})
-		overviewContent.Objects[1] = timeBar
-		overviewContent.Refresh()
-	}
-	rebuildTimeBar()
+	timeBar := newTimeRangeBar(selectedRange, func(idx int) {
+		selectedRange = idx
+	})
+
+	graphBox := gtk.NewBox(gtk.OrientationVertical, 8)
+	graphBox.Append(battGraph.area)
+	graphBox.Append(energyGr.area)
+
+	overviewBox := gtk.NewBox(gtk.OrientationVertical, 8)
+	overviewBox.SetMarginStart(12)
+	overviewBox.SetMarginEnd(12)
+	overviewBox.SetMarginTop(12)
+	overviewBox.SetMarginBottom(12)
+	overviewBox.Append(stats.container)
+	overviewBox.Append(timeBar.container)
+	overviewBox.Append(graphBox)
 
 	// Placeholder pages
-	batteryPage := container.NewCenter(widget.NewLabel("Battery Status — Coming Soon"))
-	calibrationPage := container.NewCenter(widget.NewLabel("Calibration — Coming Soon"))
-	settingsPage := container.NewCenter(widget.NewLabel("Settings — Coming Soon"))
+	batteryPage := adw.NewStatusPage()
+	batteryPage.SetTitle("Battery Status")
+	batteryPage.SetDescription("Coming Soon")
+	batteryPage.SetIconName("battery-full-symbolic")
 
-	tabs := container.NewAppTabs(
-		container.NewTabItem("Overview", overviewContent),
-		container.NewTabItem("Battery Status", batteryPage),
-		container.NewTabItem("Calibration", calibrationPage),
-		container.NewTabItem("Settings", settingsPage),
-	)
-	tabs.SetTabLocation(container.TabLocationLeading)
+	calibrationPage := adw.NewStatusPage()
+	calibrationPage.SetTitle("Calibration")
+	calibrationPage.SetDescription("Coming Soon")
+	calibrationPage.SetIconName("preferences-color-symbolic")
 
-	w.SetContent(tabs)
+	settingsPage := adw.NewStatusPage()
+	settingsPage.SetTitle("Settings")
+	settingsPage.SetDescription("Coming Soon")
+	settingsPage.SetIconName("preferences-system-symbolic")
+
+	// Stack with pages
+	stack := gtk.NewStack()
+	stack.SetTransitionType(gtk.StackTransitionTypeCrossfade)
+	stack.AddTitled(overviewBox, "overview", "Overview")
+	stack.AddTitled(batteryPage, "battery", "Battery Status")
+	stack.AddTitled(calibrationPage, "calibration", "Calibration")
+	stack.AddTitled(settingsPage, "settings", "Settings")
+
+	// Header bar with stack switcher
+	switcher := gtk.NewStackSwitcher()
+	switcher.SetStack(stack)
+
+	headerBar := adw.NewHeaderBar()
+	headerBar.SetTitleWidget(switcher)
+
+	// Main layout
+	mainBox := gtk.NewBox(gtk.OrientationVertical, 0)
+	mainBox.Append(headerBar)
+	mainBox.Append(stack)
+
+	win.SetContent(mainBox)
+	win.Show()
 
 	// Initial data load
-	refreshData(client, stats, battGraph, energyGr, selectedRange)
+	refreshData()
 
 	// Auto-refresh every 5 seconds
-	go func() {
-		ticker := time.NewTicker(5 * time.Second)
-		defer ticker.Stop()
-		for range ticker.C {
-			fyne.DoAndWait(func() {
-				refreshData(client, stats, battGraph, energyGr, selectedRange)
-			})
-		}
-	}()
-
-	w.ShowAndRun()
+	glib.TimeoutSecondsAdd(5, func() bool {
+		refreshData()
+		return true
+	})
 }
 
-func refreshData(client *dbusClient, stats *statsBar, battGraph *batteryGraph, energyGr *energyGraph, rangeIdx int) {
+func refreshData() {
 	now := time.Now()
-	from := now.Add(-timeRanges[rangeIdx].Duration)
+	from := now.Add(-timeRanges[selectedRange].Duration)
 
 	current, err := client.GetCurrentStats()
 	if err == nil {

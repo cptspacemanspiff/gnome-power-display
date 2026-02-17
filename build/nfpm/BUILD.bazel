@@ -1,0 +1,14 @@
+load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
+
+bzl_library(
+    name = "extensions",
+    srcs = ["extensions.bzl"],
+    visibility = ["//visibility:public"],
+    deps = [":nfpm"],
+)
+
+bzl_library(
+    name = "nfpm",
+    srcs = ["nfpm.bzl"],
+    visibility = ["//visibility:public"],
+)

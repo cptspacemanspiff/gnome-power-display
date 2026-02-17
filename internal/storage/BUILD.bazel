@@ -10,7 +10,7 @@ go_library(
     visibility = ["//:__subpackages__"],
     deps = [
         "//internal/collector",
-        "@com_github_mattn_go_sqlite3//:go-sqlite3",
+        "@com_github_mattn_go_sqlite3//:go_default_library",
     ],
 )
 
@@ -21,4 +21,5 @@ go_test(
         "db_test.go",
     ],
     embed = [":storage"],
+    deps = ["//internal/collector"],
 )
