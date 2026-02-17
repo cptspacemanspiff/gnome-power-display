@@ -14,6 +14,7 @@ go_library(
         "dbus.go",
         "graphs.go",
         "main.go",
+        "settings.go",
         "stats.go",
         "theme.go",
         "timerange.go",
@@ -22,6 +23,7 @@ go_library(
     visibility = ["//visibility:private"],
     deps = [
         "//internal/collector",
+        "//internal/config",
         "@com_github_diamondburned_gotk4_adwaita_pkg//adw:go_default_library",
         "@com_github_diamondburned_gotk4_pkg//cairo:go_default_library",
         "@com_github_diamondburned_gotk4_pkg//gdk/v4:go_default_library",

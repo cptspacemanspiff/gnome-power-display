@@ -96,11 +96,8 @@ func activate(app *adw.Application) {
 	calibrationPage.SetIconName("preferences-color-symbolic")
 	stack.AddNamed(calibrationPage, "calibration")
 
-	settingsPage := adw.NewStatusPage()
-	settingsPage.SetTitle("Settings")
-	settingsPage.SetDescription("Coming Soon")
-	settingsPage.SetIconName("preferences-system-symbolic")
-	stack.AddNamed(settingsPage, "settings")
+	settingsPage := newSettingsPage()
+	stack.AddNamed(settingsPage.container, "settings")
 
 	// Sidebar
 	sidebar := gtk.NewListBox()

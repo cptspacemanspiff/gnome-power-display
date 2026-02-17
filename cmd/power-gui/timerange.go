@@ -28,6 +28,7 @@ type timeRangeBar struct {
 func newTimeRangeBar(selected int, onSelect func(int)) *timeRangeBar {
 	bar := &timeRangeBar{}
 	bar.container = gtk.NewBox(gtk.OrientationHorizontal, 4)
+	bar.container.SetHAlign(gtk.AlignCenter)
 	bar.container.AddCSSClass("time-range-bar")
 
 	bar.buttons = make([]*gtk.ToggleButton, len(timeRanges))

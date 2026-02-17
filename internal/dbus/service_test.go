@@ -8,10 +8,11 @@ import (
 	godbus "github.com/godbus/dbus/v5"
 
 	"github.com/cptspacemanspiff/gnome-power-display/internal/collector"
+	pmconfig "github.com/cptspacemanspiff/gnome-power-display/internal/config"
 	"github.com/cptspacemanspiff/gnome-power-display/internal/storage"
 )
 
-func newTestService(t *testing.T) (*Service, *storage.DB) {
+func newTestService(t *testing.T) (*Service, *storage.DB, string) {
 	t.Helper()
 
 	path := filepath.Join(t.TempDir(), "test.db")
@@ -25,11 +26,23 @@ func newTestService(t *testing.T) (*Service, *storage.DB) {
 		}
 	})
 
-	return NewService(db), db
+	configPath := filepath.Join(t.TempDir(), "config.toml")
+	cfg := pmconfig.DefaultConfig()
+	cfg.Storage.DBPath = filepath.Join(t.TempDir(), "daemon.db")
+	if err := pmconfig.Save(configPath, cfg); err != nil {
+		t.Fatalf("config.Save() error = %v", err)
+	}
+
+	svc, err := NewService(db, cfg, configPath)
+	if err != nil {
+		t.Fatalf("NewService() error = %v", err)
+	}
+
+	return svc, db, configPath
 }
 
 func TestService_InvalidTimeRanges(t *testing.T) {
-	svc, _ := newTestService(t)
+	svc, _, _ := newTestService(t)
 
 	tests := []struct {
 		name string
@@ -110,7 +123,7 @@ func TestService_InvalidTimeRanges(t *testing.T) {
 }
 
 func TestService_SuccessJSONShapes(t *testing.T) {
-	svc, db := newTestService(t)
+	svc, db, _ := newTestService(t)
 
 	if err := db.InsertBatterySample(collector.BatterySample{Timestamp: 100, VoltageUV: 11000000, CurrentUA: 1000000, PowerUW: 1100000, CapacityPct: 80, Status: "Discharging"}); err != nil {
 		t.Fatalf("InsertBatterySample() error = %v", err)
@@ -180,5 +193,61 @@ func TestService_SuccessJSONShapes(t *testing.T) {
 	}
 	if _, ok := proc["cpu_freq"]; !ok {
 		t.Fatalf("process JSON missing key %q: %s", "cpu_freq", procJSON)
+	}
+}
+
+func TestService_ConfigMethods(t *testing.T) {
+	svc, _, configPath := newTestService(t)
+
+	currentJSON, dbusErr := svc.GetConfig()
+	if dbusErr != nil {
+		t.Fatalf("GetConfig() error = %v", dbusErr)
+	}
+
+	var current pmconfig.Config
+	if err := json.Unmarshal([]byte(currentJSON), &current); err != nil {
+		t.Fatalf("unmarshal current config JSON: %v", err)
+	}
+
+	current.Storage.DBPath = " /tmp/power-monitor/../updated.db "
+	current.Collection.IntervalSeconds = 7
+
+	payload, err := json.Marshal(current)
+	if err != nil {
+		t.Fatalf("marshal update payload: %v", err)
+	}
+
+	updatedJSON, dbusErr := svc.UpdateConfig(string(payload))
+	if dbusErr != nil {
+		t.Fatalf("UpdateConfig() error = %v", dbusErr)
+	}
+
+	var updated pmconfig.Config
+	if err := json.Unmarshal([]byte(updatedJSON), &updated); err != nil {
+		t.Fatalf("unmarshal updated config JSON: %v", err)
+	}
+
+	if updated.Storage.DBPath != "/tmp/updated.db" {
+		t.Fatalf("updated DBPath = %q, want /tmp/updated.db", updated.Storage.DBPath)
+	}
+	if updated.Collection.IntervalSeconds != 7 {
+		t.Fatalf("updated IntervalSeconds = %d, want 7", updated.Collection.IntervalSeconds)
+	}
+
+	persisted, err := pmconfig.Load(configPath)
+	if err != nil {
+		t.Fatalf("Load(configPath) error = %v", err)
+	}
+	if persisted.Storage.DBPath != updated.Storage.DBPath {
+		t.Fatalf("persisted DBPath = %q, want %q", persisted.Storage.DBPath, updated.Storage.DBPath)
+	}
+}
+
+func TestService_UpdateConfigRejectsInvalidConfig(t *testing.T) {
+	svc, _, _ := newTestService(t)
+
+	_, dbusErr := svc.UpdateConfig(`{"storage":{"db_path":"relative/path","state_log_path":"/tmp/state-log.jsonl"}}`)
+	if dbusErr == nil {
+		t.Fatal("UpdateConfig() error = nil, want D-Bus error")
 	}
 }

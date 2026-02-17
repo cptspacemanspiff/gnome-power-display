@@ -3,11 +3,14 @@ package dbus
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
+	"sync"
 
 	godbus "github.com/godbus/dbus/v5"
 	"github.com/godbus/dbus/v5/introspect"
 
 	"github.com/cptspacemanspiff/gnome-power-display/internal/collector"
+	"github.com/cptspacemanspiff/gnome-power-display/internal/config"
 	"github.com/cptspacemanspiff/gnome-power-display/internal/storage"
 )
 
@@ -15,6 +18,8 @@ const (
 	BusName   = "org.gnome.PowerMonitor"
 	ObjPath   = "/org/gnome/PowerMonitor"
 	IfaceName = "org.gnome.PowerMonitor"
+
+	maxConfigPayloadBytes = 64 * 1024
 )
 
 const introspectXML = `
@@ -41,18 +46,36 @@ const introspectXML = `
       <arg direction="in" type="x" name="to_epoch"/>
       <arg direction="out" type="s" name="json"/>
     </method>
+    <method name="GetConfig">
+      <arg direction="out" type="s" name="json"/>
+    </method>
+    <method name="UpdateConfig">
+      <arg direction="in" type="s" name="config_json"/>
+      <arg direction="out" type="s" name="json"/>
+    </method>
   </interface>
 ` + introspect.IntrospectDataString + `
 </node>`
 
 // Service exposes the power monitor over D-Bus.
 type Service struct {
-	store *storage.DB
+	store      *storage.DB
+	cfgMu      sync.RWMutex
+	cfg        *config.Config
+	configPath string
 }
 
 // NewService creates a new D-Bus service.
-func NewService(store *storage.DB) *Service {
-	return &Service{store: store}
+func NewService(store *storage.DB, cfg *config.Config, configPath string) (*Service, error) {
+	trimmedConfigPath := strings.TrimSpace(configPath)
+	if trimmedConfigPath == "" {
+		return nil, fmt.Errorf("config path must not be empty")
+	}
+	sanitizedCfg, err := config.NormalizeAndValidate(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("sanitize config: %w", err)
+	}
+	return &Service{store: store, cfg: sanitizedCfg, configPath: trimmedConfigPath}, nil
 }
 
 // Export registers the service on the system bus.
@@ -165,6 +188,49 @@ func (s *Service) GetProcessHistory(fromEpoch, toEpoch int64) (string, *godbus.E
 	}
 	result := map[string]any{"processes": procs, "cpu_freq": freqs}
 	data, err := json.Marshal(result)
+	if err != nil {
+		return "", godbus.MakeFailedError(err)
+	}
+	return string(data), nil
+}
+
+// GetConfig returns the daemon configuration as JSON.
+func (s *Service) GetConfig() (string, *godbus.Error) {
+	s.cfgMu.RLock()
+	cfgCopy := *s.cfg
+	s.cfgMu.RUnlock()
+
+	data, err := json.Marshal(cfgCopy)
+	if err != nil {
+		return "", godbus.MakeFailedError(err)
+	}
+	return string(data), nil
+}
+
+// UpdateConfig sanitizes and persists a new daemon configuration.
+func (s *Service) UpdateConfig(configJSON string) (string, *godbus.Error) {
+	if len(configJSON) > maxConfigPayloadBytes {
+		return "", godbus.MakeFailedError(fmt.Errorf("config update payload too large: %d bytes", len(configJSON)))
+	}
+
+	var candidate config.Config
+	if err := json.Unmarshal([]byte(configJSON), &candidate); err != nil {
+		return "", godbus.MakeFailedError(fmt.Errorf("parse config JSON: %w", err))
+	}
+
+	sanitized, err := config.NormalizeAndValidate(&candidate)
+	if err != nil {
+		return "", godbus.MakeFailedError(err)
+	}
+	if err := config.Save(s.configPath, sanitized); err != nil {
+		return "", godbus.MakeFailedError(fmt.Errorf("persist config: %w", err))
+	}
+
+	s.cfgMu.Lock()
+	s.cfg = sanitized
+	s.cfgMu.Unlock()
+
+	data, err := json.Marshal(sanitized)
 	if err != nil {
 		return "", godbus.MakeFailedError(err)
 	}

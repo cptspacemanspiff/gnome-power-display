@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -111,52 +112,68 @@ func TestLoad_ValidationErrors(t *testing.T) {
 		wantErrSub string
 	}{
 		{
-			name: "interval_seconds must be positive",
+			name: "interval_seconds too low",
 			contents: `
 [collection]
 interval_seconds = 0
 `,
-			wantErrSub: "collection.interval_seconds must be positive",
+			wantErrSub: "collection.interval_seconds must be between 1 and 3600",
 		},
 		{
-			name: "top_processes must be positive",
+			name: "top_processes too low",
 			contents: `
 [collection]
 top_processes = 0
 `,
-			wantErrSub: "collection.top_processes must be positive",
+			wantErrSub: "collection.top_processes must be between 1 and 500",
 		},
 		{
-			name: "wall_clock_jump_threshold_seconds must be positive",
+			name: "wall_clock_jump_threshold_seconds too low",
 			contents: `
 [collection]
 wall_clock_jump_threshold_seconds = 0
 `,
-			wantErrSub: "collection.wall_clock_jump_threshold_seconds must be positive",
+			wantErrSub: "collection.wall_clock_jump_threshold_seconds must be between 1 and 3600",
 		},
 		{
-			name: "power_average_seconds must be positive",
+			name: "power_average_seconds too low",
 			contents: `
 [collection]
 power_average_seconds = 0
 `,
-			wantErrSub: "collection.power_average_seconds must be positive",
+			wantErrSub: "collection.power_average_seconds must be between 1 and 3600",
 		},
 		{
-			name: "retention_days must be positive",
+			name: "retention_days too low",
 			contents: `
 [cleanup]
 retention_days = 0
 `,
-			wantErrSub: "cleanup.retention_days must be positive",
+			wantErrSub: "cleanup.retention_days must be between 1 and 3650",
 		},
 		{
-			name: "interval_hours must be positive",
+			name: "interval_hours too low",
 			contents: `
 [cleanup]
 interval_hours = 0
 `,
-			wantErrSub: "cleanup.interval_hours must be positive",
+			wantErrSub: "cleanup.interval_hours must be between 1 and 720",
+		},
+		{
+			name: "db_path must not be empty",
+			contents: `
+[storage]
+db_path = ""
+`,
+			wantErrSub: "storage.db_path must not be empty",
+		},
+		{
+			name: "state_log_path must be absolute",
+			contents: `
+[storage]
+state_log_path = "state.log"
+`,
+			wantErrSub: "storage.state_log_path must be an absolute path",
 		},
 	}
 
@@ -172,5 +189,43 @@ interval_hours = 0
 				t.Fatalf("Load() error = %q, want contains %q", err.Error(), tt.wantErrSub)
 			}
 		})
+	}
+}
+
+func TestNormalizeAndValidate_SanitizesPaths(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Storage.DBPath = " /tmp/power-monitor/../data.db "
+	cfg.Storage.StateLogPath = " /var/lib/power-monitor//state-log.jsonl "
+
+	sanitized, err := NormalizeAndValidate(cfg)
+	if err != nil {
+		t.Fatalf("NormalizeAndValidate() error = %v", err)
+	}
+
+	if sanitized.Storage.DBPath != "/tmp/data.db" {
+		t.Fatalf("DBPath = %q, want /tmp/data.db", sanitized.Storage.DBPath)
+	}
+	if sanitized.Storage.StateLogPath != "/var/lib/power-monitor/state-log.jsonl" {
+		t.Fatalf("StateLogPath = %q, want /var/lib/power-monitor/state-log.jsonl", sanitized.Storage.StateLogPath)
+	}
+}
+
+func TestSave_RoundTrip(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "etc", "power-monitor", "config.toml")
+	cfg := DefaultConfig()
+	cfg.Collection.IntervalSeconds = 9
+	cfg.Collection.TopProcesses = 25
+
+	if err := Save(path, cfg); err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+
+	loaded, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if !reflect.DeepEqual(loaded, cfg) {
+		t.Fatalf("Load() after Save() mismatch:\n got: %#v\nwant: %#v", loaded, cfg)
 	}
 }

@@ -136,7 +136,11 @@ func main() {
 	// Run cleanup on startup.
 	runCleanup(store, cfg.Cleanup.RetentionDays, logger)
 
-	svc := dbussvc.NewService(store)
+	svc, err := dbussvc.NewService(store, cfg, *configPath)
+	if err != nil {
+		logger.Error("initialize dbus service", "err", err)
+		os.Exit(1)
+	}
 	conn, err := svc.Export()
 	if err != nil {
 		logger.Error("export dbus service", "err", err)

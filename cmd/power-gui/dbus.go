@@ -8,6 +8,7 @@ import (
 	godbus "github.com/godbus/dbus/v5"
 
 	"github.com/cptspacemanspiff/gnome-power-display/internal/collector"
+	pmconfig "github.com/cptspacemanspiff/gnome-power-display/internal/config"
 )
 
 const (
@@ -90,4 +91,36 @@ func (c *dbusClient) GetPowerStateEvents(from, to time.Time) ([]collector.PowerS
 		return nil, err
 	}
 	return events, nil
+}
+
+func (c *dbusClient) GetConfig() (*pmconfig.Config, error) {
+	var jsonStr string
+	err := c.obj.Call(dbusIface+".GetConfig", 0).Store(&jsonStr)
+	if err != nil {
+		return nil, err
+	}
+	var cfg pmconfig.Config
+	if err := json.Unmarshal([]byte(jsonStr), &cfg); err != nil {
+		return nil, err
+	}
+	return &cfg, nil
+}
+
+func (c *dbusClient) UpdateConfig(cfg *pmconfig.Config) (*pmconfig.Config, error) {
+	configJSON, err := json.Marshal(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	var jsonStr string
+	err = c.obj.Call(dbusIface+".UpdateConfig", 0, string(configJSON)).Store(&jsonStr)
+	if err != nil {
+		return nil, err
+	}
+
+	var updated pmconfig.Config
+	if err := json.Unmarshal([]byte(jsonStr), &updated); err != nil {
+		return nil, err
+	}
+	return &updated, nil
 }

@@ -7,6 +7,7 @@ go_library(
     visibility = ["//:__subpackages__"],
     deps = [
         "//internal/collector",
+        "//internal/config",
         "//internal/storage",
         "@com_github_godbus_dbus_v5//:go_default_library",
         "@com_github_godbus_dbus_v5//introspect:go_default_library",
@@ -19,6 +20,7 @@ go_test(
     embed = [":dbus"],
     deps = [
         "//internal/collector",
+        "//internal/config",
         "//internal/storage",
         "@com_github_godbus_dbus_v5//:go_default_library",
     ],

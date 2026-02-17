@@ -22,10 +22,22 @@ detect_pkg_manager() {
 
 PKG_TYPE="$(detect_pkg_manager)"
 LOCAL_ONLY=0
+CLEAN=0
 
-if [ "${2:-}" = "--local-only" ]; then
-  LOCAL_ONLY=1
-fi
+for arg in "${@:2}"; do
+  case "$arg" in
+    --local-only)
+      LOCAL_ONLY=1
+      ;;
+    --clean)
+      CLEAN=1
+      ;;
+    *)
+      echo "Error: Unknown option: $arg" >&2
+      exit 1
+      ;;
+  esac
+done
 
 # Bazel target suffix matches package type
 build_packages() {
@@ -54,6 +66,11 @@ find_package() {
 }
 
 do_install() {
+  do_install_with_mode 0
+}
+
+do_install_with_mode() {
+  local force_reinstall="$1"
   build_packages
   local daemon_pkg extension_pkg
   daemon_pkg="$(find_package "$DAEMON_PKG")"
@@ -62,15 +79,31 @@ do_install() {
   echo "Installing packages..."
   if [ "$LOCAL_ONLY" -eq 1 ]; then
     if [ "$PKG_TYPE" = "rpm" ]; then
-      sudo rpm -i "$daemon_pkg" "$extension_pkg"
+      if [ "$force_reinstall" -eq 1 ]; then
+        sudo rpm -U --replacepkgs "$daemon_pkg" "$extension_pkg"
+      else
+        sudo rpm -U "$daemon_pkg" "$extension_pkg"
+      fi
     else
-      sudo dpkg -i "$daemon_pkg" "$extension_pkg"
+      if [ "$force_reinstall" -eq 1 ]; then
+        sudo dpkg -i --force-reinstall "$daemon_pkg" "$extension_pkg"
+      else
+        sudo dpkg -i "$daemon_pkg" "$extension_pkg"
+      fi
     fi
   else
     if [ "$PKG_TYPE" = "rpm" ]; then
-      sudo dnf install -y "$daemon_pkg" "$extension_pkg"
+      if [ "$force_reinstall" -eq 1 ]; then
+        sudo dnf reinstall -y "$daemon_pkg" "$extension_pkg" || sudo dnf install -y "$daemon_pkg" "$extension_pkg"
+      else
+        sudo dnf install -y "$daemon_pkg" "$extension_pkg"
+      fi
     else
-      sudo apt install -y "$daemon_pkg" "$extension_pkg"
+      if [ "$force_reinstall" -eq 1 ]; then
+        sudo apt install --reinstall -y "$daemon_pkg" "$extension_pkg"
+      else
+        sudo apt install -y "$daemon_pkg" "$extension_pkg"
+      fi
     fi
   fi
   echo "Done."
@@ -87,8 +120,12 @@ do_uninstall() {
 }
 
 do_reinstall() {
-  do_uninstall
-  do_install
+  if [ "$CLEAN" -eq 1 ]; then
+    do_uninstall
+    do_install
+    return
+  fi
+  do_install_with_mode 1
 }
 
 do_status() {
@@ -109,15 +146,17 @@ case "${1:-}" in
   reinstall) do_reinstall ;;
   status)    do_status ;;
   *)
-    echo "Usage: $0 {install|uninstall|reinstall|status} [--local-only]"
+    echo "Usage: $0 {install|uninstall|reinstall|status} [--local-only] [--clean]"
     echo ""
     echo "  install    - Build and install daemon + extension packages"
     echo "  uninstall  - Remove both packages"
-    echo "  reinstall  - Uninstall then build and install fresh"
+    echo "  reinstall  - Build and reinstall packages in place"
     echo "  status     - Show installed package versions and daemon status"
     echo ""
     echo "  --local-only"
-    echo "             - Install local packages directly (rpm -i or dpkg -i)"
+    echo "             - Install local packages directly (rpm -U / dpkg -i)"
+    echo "  --clean"
+    echo "             - With reinstall, uninstall first (wipes package-owned data)"
     exit 1
     ;;
 esac
