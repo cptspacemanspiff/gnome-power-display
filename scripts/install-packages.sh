@@ -21,6 +21,11 @@ detect_pkg_manager() {
 }
 
 PKG_TYPE="$(detect_pkg_manager)"
+LOCAL_ONLY=0
+
+if [ "${2:-}" = "--local-only" ]; then
+  LOCAL_ONLY=1
+fi
 
 # Bazel target suffix matches package type
 build_packages() {
@@ -55,10 +60,18 @@ do_install() {
   extension_pkg="$(find_package "$EXTENSION_PKG")"
 
   echo "Installing packages..."
-  if [ "$PKG_TYPE" = "rpm" ]; then
-    sudo dnf install -y "$daemon_pkg" "$extension_pkg"
+  if [ "$LOCAL_ONLY" -eq 1 ]; then
+    if [ "$PKG_TYPE" = "rpm" ]; then
+      sudo rpm -i "$daemon_pkg" "$extension_pkg"
+    else
+      sudo dpkg -i "$daemon_pkg" "$extension_pkg"
+    fi
   else
-    sudo apt install -y "$daemon_pkg" "$extension_pkg"
+    if [ "$PKG_TYPE" = "rpm" ]; then
+      sudo dnf install -y "$daemon_pkg" "$extension_pkg"
+    else
+      sudo apt install -y "$daemon_pkg" "$extension_pkg"
+    fi
   fi
   echo "Done."
 }
@@ -96,12 +109,15 @@ case "${1:-}" in
   reinstall) do_reinstall ;;
   status)    do_status ;;
   *)
-    echo "Usage: $0 {install|uninstall|reinstall|status}"
+    echo "Usage: $0 {install|uninstall|reinstall|status} [--local-only]"
     echo ""
     echo "  install    - Build and install daemon + extension packages"
     echo "  uninstall  - Remove both packages"
     echo "  reinstall  - Uninstall then build and install fresh"
     echo "  status     - Show installed package versions and daemon status"
+    echo ""
+    echo "  --local-only"
+    echo "             - Install local packages directly (rpm -i or dpkg -i)"
     exit 1
     ;;
 esac

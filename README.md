@@ -63,6 +63,15 @@ sudo bazel-bin/cmd/power-calibrate/power-calibrate_/power-calibrate
 # Requires mutter-devel on Fedora
 ./gnome-extension/install.sh nested
 
+# Test the packaged extension in a nested shell (no local symlink)
+./scripts/spawn-wayland-packaged.sh
+
+# Rebuild/reinstall RPMs, then launch packaged nested session
+./scripts/debug-packaged-extension.sh
+
+# Same as above, but install local package files directly (rpm -i / dpkg -i)
+./scripts/debug-packaged-extension.sh --local-only
+
 # Tail extension logs
 ./gnome-extension/install.sh log
 ```
