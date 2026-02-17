@@ -16,8 +16,6 @@ func loadCSS() {
 		}
 		.stats-bar {
 			padding: 8px 12px;
-			background: alpha(@accent_bg_color, 0.15);
-			border-radius: 8px;
 		}
 		.stat-title {
 			font-size: 11px;
@@ -26,7 +24,7 @@ func loadCSS() {
 		.stat-value {
 			font-size: 18px;
 			font-weight: bold;
-			color: @accent_color;
+			color: @window_fg_color;
 		}
 		.time-range-bar {
 			padding: 4px 0;
