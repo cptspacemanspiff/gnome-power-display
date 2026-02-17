@@ -66,6 +66,19 @@ func (c *dbusClient) GetHistory(from, to time.Time) (*historyData, error) {
 	return &data, nil
 }
 
+func (c *dbusClient) GetBatteryHealth() (*collector.BatteryHealth, error) {
+	var jsonStr string
+	err := c.obj.Call(dbusIface+".GetBatteryHealth", 0).Store(&jsonStr)
+	if err != nil {
+		return nil, err
+	}
+	var health collector.BatteryHealth
+	if err := json.Unmarshal([]byte(jsonStr), &health); err != nil {
+		return nil, err
+	}
+	return &health, nil
+}
+
 func (c *dbusClient) GetPowerStateEvents(from, to time.Time) ([]collector.PowerStateEvent, error) {
 	var jsonStr string
 	err := c.obj.Call(dbusIface+".GetPowerStateEvents", 0, from.Unix(), to.Unix()).Store(&jsonStr)

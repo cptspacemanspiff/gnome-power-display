@@ -7,6 +7,7 @@ import (
 	godbus "github.com/godbus/dbus/v5"
 	"github.com/godbus/dbus/v5/introspect"
 
+	"github.com/cptspacemanspiff/gnome-power-display/internal/collector"
 	"github.com/cptspacemanspiff/gnome-power-display/internal/storage"
 )
 
@@ -30,6 +31,9 @@ const introspectXML = `
     <method name="GetPowerStateEvents">
       <arg direction="in" type="x" name="from_epoch"/>
       <arg direction="in" type="x" name="to_epoch"/>
+      <arg direction="out" type="s" name="json"/>
+    </method>
+    <method name="GetBatteryHealth">
       <arg direction="out" type="s" name="json"/>
     </method>
     <method name="GetProcessHistory">
@@ -127,6 +131,19 @@ func (s *Service) GetPowerStateEvents(fromEpoch, toEpoch int64) (string, *godbus
 		return "", godbus.MakeFailedError(fmt.Errorf("query power state events: %w", err))
 	}
 	data, err := json.Marshal(events)
+	if err != nil {
+		return "", godbus.MakeFailedError(err)
+	}
+	return string(data), nil
+}
+
+// GetBatteryHealth returns battery identity and health info as JSON.
+func (s *Service) GetBatteryHealth() (string, *godbus.Error) {
+	health, err := collector.CollectBatteryHealth()
+	if err != nil {
+		return "", godbus.MakeFailedError(fmt.Errorf("collect battery health: %w", err))
+	}
+	data, err := json.Marshal(health)
 	if err != nil {
 		return "", godbus.MakeFailedError(err)
 	}

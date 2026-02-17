@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "backlight.go",
         "battery.go",
+        "battery_health.go",
         "process.go",
         "sleep.go",
         "statelog.go",

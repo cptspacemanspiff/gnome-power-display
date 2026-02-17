@@ -29,6 +29,18 @@ type PowerStateEvent struct {
 	HibernateSecs int64  `json:"hibernate_secs"` // seconds in hibernate phase (0 if pure suspend/shutdown)
 }
 
+// BatteryHealth holds static/slow-changing battery identity and health info.
+type BatteryHealth struct {
+	Manufacturer        string `json:"manufacturer"`
+	Model               string `json:"model"`
+	Serial              string `json:"serial"`
+	Technology          string `json:"technology"`
+	CycleCount          int64  `json:"cycle_count"`
+	ChargeFullDesignUAH int64  `json:"charge_full_design_uah"`
+	ChargeFullUAH       int64  `json:"charge_full_uah"`
+	VoltageMinDesignUV  int64  `json:"voltage_min_design_uv"`
+}
+
 // ProcessSample holds a per-process CPU usage snapshot for one sampling interval.
 type ProcessSample struct {
 	Timestamp     int64  `json:"timestamp"`

@@ -10,6 +10,7 @@ go_binary(
 go_library(
     name = "power-gui_lib",
     srcs = [
+        "battery.go",
         "dbus.go",
         "graphs.go",
         "main.go",

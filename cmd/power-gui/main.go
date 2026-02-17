@@ -86,12 +86,9 @@ func activate(app *adw.Application) {
 
 	stack.AddNamed(overviewBox, "overview")
 
-	// Placeholder pages
-	batteryPage := adw.NewStatusPage()
-	batteryPage.SetTitle("Battery Status")
-	batteryPage.SetDescription("Coming Soon")
-	batteryPage.SetIconName("battery-full-symbolic")
-	stack.AddNamed(batteryPage, "battery")
+	// Battery health page
+	batteryPage := newBatteryHealthPage()
+	stack.AddNamed(batteryPage.container, "battery")
 
 	calibrationPage := adw.NewStatusPage()
 	calibrationPage.SetTitle("Calibration")
