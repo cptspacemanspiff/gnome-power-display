@@ -53,7 +53,13 @@ def _nfpm_pkg_impl(ctx):
     version = ctx.attr.version
     name = ctx.attr.package_name if ctx.attr.package_name else ctx.label.name
 
-    out_file = ctx.actions.declare_file("{}.{}".format(name, packager))
+    arch = ctx.attr.arch
+    if packager == "rpm":
+        rpm_arch = {"amd64": "x86_64", "arm64": "aarch64"}.get(arch, arch)
+        out_name = "{}-{}-1.{}.rpm".format(name, version, rpm_arch)
+    else:
+        out_name = "{}_{}_{}".format(name, version, arch) + ".deb"
+    out_file = ctx.actions.declare_file(out_name)
 
     # Collect all srcs
     src_files = []
@@ -140,6 +146,10 @@ nfpm_pkg = rule(
             doc = "Map from substring of source short_path to destination path in staging dir. " +
                   "Use this to place Bazel outputs where the nfpm config expects them. " +
                   'E.g. {"cmd/power-monitor-daemon": "build/power-monitor-daemon"}',
+        ),
+        "arch": attr.string(
+            default = "amd64",
+            doc = "Package architecture (e.g. amd64, arm64).",
         ),
         "packager": attr.string(
             default = "rpm",

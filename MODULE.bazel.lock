@@ -220,7 +220,7 @@
   "moduleExtensions": {
     "//build/nfpm:extensions.bzl%nfpm": {
       "general": {
-        "bzlTransitiveDigest": "j9t01IfXdFdc0F03zplOzEtQGXz7iZNZTdqeCT+8wKs=",
+        "bzlTransitiveDigest": "SHWTdUULPpFm432VxWeJeM1fi8jXUNDX11guPTFmLtQ=",
         "usagesDigest": "Ru4xtCTWbOEhtiwh7Cs5+NAY3VWCkVzOZohCOmAkpFg=",
         "recordedInputs": [],
         "generatedRepoSpecs": {
