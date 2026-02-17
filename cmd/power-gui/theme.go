@@ -8,6 +8,12 @@ import (
 func loadCSS() {
 	provider := gtk.NewCSSProvider()
 	provider.LoadFromString(`
+		.left-pane-header {
+			padding: 4px 0;
+		}
+		.sidebar-separator {
+			opacity: 0.55;
+		}
 		.stats-bar {
 			padding: 8px 12px;
 			background: alpha(@accent_bg_color, 0.15);

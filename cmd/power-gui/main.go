@@ -112,12 +112,16 @@ func activate(app *adw.Application) {
 		sidebar.Append(row)
 	}
 
+	contentTitle := gtk.NewLabel("")
+	contentTitle.AddCSSClass("heading")
+
 	sidebar.ConnectRowSelected(func(row *gtk.ListBoxRow) {
 		if row == nil {
 			return
 		}
 		idx := row.Index()
 		if idx >= 0 && idx < len(sidebarEntries) {
+			contentTitle.SetLabel(sidebarEntries[idx].title)
 			stack.SetVisibleChildName(sidebarEntries[idx].id)
 		}
 	})
@@ -130,21 +134,35 @@ func activate(app *adw.Application) {
 	sidebarScroll := gtk.NewScrolledWindow()
 	sidebarScroll.SetPolicy(gtk.PolicyNever, gtk.PolicyAutomatic)
 	sidebarScroll.SetChild(sidebar)
-	sidebarScroll.SetSizeRequest(200, -1)
+	sidebarScroll.SetSizeRequest(250, -1)
+	sidebarScroll.SetVExpand(true)
 
-	// Header bar (clean, no switcher)
-	headerBar := adw.NewHeaderBar()
-	headerBar.SetTitleWidget(gtk.NewLabel("Power Monitor"))
+	leftTitle := gtk.NewLabel("Power Monitor")
+	leftTitle.AddCSSClass("heading")
+	leftTitle.SetXAlign(0)
 
-	// Content area with header
-	contentBox := gtk.NewBox(gtk.OrientationVertical, 0)
-	contentBox.Append(headerBar)
+	leftHeader := gtk.NewBox(gtk.OrientationHorizontal, 0)
+	leftHeader.AddCSSClass("left-pane-header")
+	leftHeader.SetMarginStart(12)
+	leftHeader.SetMarginEnd(12)
+	leftHeader.SetMarginTop(8)
+	leftHeader.SetMarginBottom(8)
+	leftHeader.Append(leftTitle)
+
+	leftPane := gtk.NewBox(gtk.OrientationVertical, 0)
+	leftPane.SetVExpand(true)
+	leftPane.Append(leftHeader)
+	leftPane.Append(sidebarScroll)
+
+	rightHeader := adw.NewHeaderBar()
+	rightHeader.SetTitleWidget(contentTitle)
 
 	// Horizontal split: sidebar | content
 	splitBox := gtk.NewBox(gtk.OrientationHorizontal, 0)
-	splitBox.Append(sidebarScroll)
+	splitBox.Append(leftPane)
 
 	separator := gtk.NewSeparator(gtk.OrientationVertical)
+	separator.AddCSSClass("sidebar-separator")
 	splitBox.Append(separator)
 
 	contentScroll := gtk.NewScrolledWindow()
@@ -152,11 +170,15 @@ func activate(app *adw.Application) {
 	contentScroll.SetChild(stack)
 	contentScroll.SetHExpand(true)
 	contentScroll.SetVExpand(true)
-	splitBox.Append(contentScroll)
 
-	contentBox.Append(splitBox)
+	rightPane := gtk.NewBox(gtk.OrientationVertical, 0)
+	rightPane.SetHExpand(true)
+	rightPane.Append(rightHeader)
+	rightPane.Append(contentScroll)
 
-	win.SetContent(contentBox)
+	splitBox.Append(rightPane)
+
+	win.SetContent(splitBox)
 	win.Show()
 
 	// Initial data load
