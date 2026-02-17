@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Power Monitor GUI
+Comment=Monitor battery, power draw, and energy history
+Exec=power-gui
+Icon=power-gui
+Terminal=false
+Categories=System;Monitor;GTK;
+Keywords=power;battery;energy;monitor;
+StartupNotify=true
+StartupWMClass=org.gnome.PowerMonitorGUI
