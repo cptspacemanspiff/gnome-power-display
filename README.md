@@ -1,5 +1,9 @@
 # GNOME Power Display
 
+<p align="center">
+  <img src="packaging/PowerLog_logo.png" alt="GNOME Power Display logo" width="280" />
+</p>
+
 A power monitoring suite for GNOME on Linux laptops. Tracks battery power draw, charge level, sleep/hibernate events, and display brightness over time.
 
 ## Components
