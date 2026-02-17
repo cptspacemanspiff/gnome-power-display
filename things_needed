@@ -1,1 +1,1 @@
-sudo dnf install glfw-devel libXxf86vm-devel
+sudo dnf install glfw-devel libXxf86vm-devel libadwaita-devel

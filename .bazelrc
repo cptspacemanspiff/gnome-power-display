@@ -1,0 +1,6 @@
+build --action_env=CGO_ENABLED=1
+build --host_action_env=CGO_ENABLED=1
+# # Force Bazel to resolve C++ toolchains using platforms
+# build --incompatible_enable_cc_toolchain_resolution
+# # Prevent Bazel from falling back to the local host's GCC/Clang
+# common --repo_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1

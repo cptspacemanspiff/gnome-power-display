@@ -370,7 +370,7 @@ func drawLabel(cr *cairo.Context, text string, x, y int, col rgba, fontSize int)
 	fd.SetFamily("Sans")
 	fd.SetSize(fontSize * pango.SCALE)
 	layout.SetFontDescription(fd)
-	layout.SetText(text, len(text))
+	layout.SetText(text)
 	cr.MoveTo(float64(x), float64(y))
 	pangocairo.ShowLayout(cr, layout)
 }
