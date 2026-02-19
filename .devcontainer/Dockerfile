@@ -1,7 +1,7 @@
 # Development container for GNOME Power Display
 # Includes all dependencies for building with Bazel, Go, Fyne GUI, D-Bus, and SQLite
 
-FROM mcr.microsoft.com/devcontainers/base:ubuntu-25.04
+FROM mcr.microsoft.com/devcontainers/base:ubuntu-24.04
 
 # Avoid prompts during package installation
 ARG DEBIAN_FRONTEND=noninteractive
