@@ -17,14 +17,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libsqlite3-dev \
     # D-Bus development libraries
     libdbus-1-dev \
-    # Fyne GUI dependencies (OpenGL, GLFW, X11)
-    libgl1-mesa-dev \
-    libglfw3-dev \
-    libxcursor-dev \
-    libxrandr-dev \
-    libxinerama-dev \
-    libxi-dev \
-    libxxf86vm-dev \
+    # GTK4/GLib/Adwaita development libraries (for power-gui)
+    libgtk-4-dev \
+    libglib2.0-dev \
+    libadwaita-1-dev \
     # X11 and Wayland support
     libx11-dev \
     libxkbcommon-dev \
