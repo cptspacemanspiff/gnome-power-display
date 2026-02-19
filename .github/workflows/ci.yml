@@ -108,12 +108,22 @@ jobs:
           restore-keys: |
             bazel-${{ runner.os }}-
 
-      - name: Run Bazel checks in hash-pinned devcontainer
+      - name: Bazel test
         uses: devcontainers/ci@v0.3
         with:
           configFile: .devcontainer/ci-generated/devcontainer.json
           push: never
           runCmd: |
+            set -e
             cp .bazelrc.ci .bazelrc.local
             bazel test //...
+
+      - name: Bazel build
+        uses: devcontainers/ci@v0.3
+        with:
+          configFile: .devcontainer/ci-generated/devcontainer.json
+          push: never
+          runCmd: |
+            set -e
+            cp .bazelrc.ci .bazelrc.local
             bazel build //cmd/power-monitor-daemon //cmd/power-calibrate
