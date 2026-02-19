@@ -22,28 +22,39 @@ bazel_dep(
     version = "0.47.0",
 )
 bazel_dep(name = "rules_cc", version = "0.2.16")
+bazel_dep(name = "rules_system_deps", version = "0.0.1")
+
+archive_override(
+    module_name = "rules_system_deps",
+    urls = ["https://github.com/cptspacemanspiff/rules_system_deps/archive/refs/tags/v0.0.1.tar.gz"],
+    strip_prefix = "rules_system_deps-0.0.1",
+    integrity = "sha256-etp1M75V4/kgaMrlnbH/T7zzX3KJ+1qoW25M3WvgAGQ=",
+)
 
 nfpm = use_extension("//build/nfpm:extensions.bzl", "nfpm")
 use_repo(nfpm, "nfpm_toolchain")
 
-sys_libs = use_extension("//third_party/glib_bazel:extensions.bzl", "pkg_config_ext")
+sys_libs = use_extension("@rules_system_deps//extensions:extensions.bzl", "pkg_config_ext")
 sys_libs.lib(name = "glib", pkg = "glib-2.0")
 sys_libs.lib(name = "gtk4", pkg = "gtk4")
 sys_libs.lib(name = "libadwaita", pkg = "libadwaita-1")
-use_repo(sys_libs, "glib", "gtk4", "libadwaita")
+sys_libs.go_profile(name = "gtk4", libs = ["@glib//:glib", "@gtk4//:gtk4"])
+sys_libs.go_profile(name = "adwaita", libs = ["@glib//:glib", "@gtk4//:gtk4", "@libadwaita//:libadwaita"])
+use_repo(sys_libs, "glib", "gtk4", "libadwaita", "pkg_config_go")
 
 go_deps = use_extension("@gazelle//:extensions.bzl", "go_deps")
 go_deps.from_file(go_mod = "//:go.mod")
+inject_repo(go_deps, "pkg_config_go")
 go_deps.gazelle_override(
     path = "github.com/diamondburned/gotk4/pkg",
     directives = [
-        "gazelle:map_kind go_library go_library_gtk4 @@//third_party/glib_bazel:go_with_glib.bzl",
+        "gazelle:map_kind go_library go_library_gtk4 @pkg_config_go//:defs.bzl",
     ],
 )
 go_deps.gazelle_override(
     path = "github.com/diamondburned/gotk4-adwaita/pkg",
     directives = [
-        "gazelle:map_kind go_library go_library_adwaita @@//third_party/glib_bazel:go_with_glib.bzl",
+        "gazelle:map_kind go_library go_library_adwaita @pkg_config_go//:defs.bzl",
     ],
 )
 use_repo(

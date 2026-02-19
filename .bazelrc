@@ -1,5 +1,13 @@
+try-import %workspace%/.bazelrc.local
+
 build --action_env=CGO_ENABLED=1
 build --host_action_env=CGO_ENABLED=1
+
+# Disk cache — avoids recompiling gotk4/GTK4 CGo bindings (~30 min) on clean builds
+build --disk_cache=~/.cache/bazel-disk-cache
+
+# Use all available cores for CGo compilation
+build --jobs=HOST_CPUS
 # # Force Bazel to resolve C++ toolchains using platforms
 # build --incompatible_enable_cc_toolchain_resolution
 # # Prevent Bazel from falling back to the local host's GCC/Clang

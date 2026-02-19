@@ -1,0 +1,5 @@
+# Applied on CI by copying to .bazelrc.local
+# Use workspace-relative path so the cache is on the host filesystem
+# and survives across devcontainer runs (persisted via actions/cache).
+build --disk_cache=.cache/bazel-disk-cache
+build --experimental_disk_cache_gc_max_size=2g

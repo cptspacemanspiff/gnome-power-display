@@ -100,11 +100,20 @@ jobs:
           refFilterForPush: refs/heads/main
           eventFilterForPush: push
 
+      - name: Cache Bazel disk cache
+        uses: actions/cache@v4
+        with:
+          path: .cache/bazel-disk-cache
+          key: bazel-${{ runner.os }}-${{ hashFiles('MODULE.bazel.lock', 'go.mod') }}
+          restore-keys: |
+            bazel-${{ runner.os }}-
+
       - name: Run Bazel checks in hash-pinned devcontainer
         uses: devcontainers/ci@v0.3
         with:
           configFile: .devcontainer/ci-generated/devcontainer.json
           push: never
           runCmd: |
+            cp .bazelrc.ci .bazelrc.local
             bazel test //...
             bazel build //cmd/power-monitor-daemon //cmd/power-calibrate

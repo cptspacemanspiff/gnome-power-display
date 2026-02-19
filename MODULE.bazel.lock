@@ -231,33 +231,6 @@
         }
       }
     },
-    "//third_party/glib_bazel:extensions.bzl%pkg_config_ext": {
-      "general": {
-        "bzlTransitiveDigest": "19TXS2wLUwxYHawElQCzFySxttVVKq8Ca/it2M90S5w=",
-        "usagesDigest": "7vA3gmy/LIX7eoHiFrd92rDguOOsO1NbXVp7j6RcaQw=",
-        "recordedInputs": [],
-        "generatedRepoSpecs": {
-          "glib": {
-            "repoRuleId": "@@//third_party/glib_bazel:pkg_config.bzl%pkg_config",
-            "attributes": {
-              "pkg": "glib-2.0"
-            }
-          },
-          "gtk4": {
-            "repoRuleId": "@@//third_party/glib_bazel:pkg_config.bzl%pkg_config",
-            "attributes": {
-              "pkg": "gtk4"
-            }
-          },
-          "libadwaita": {
-            "repoRuleId": "@@//third_party/glib_bazel:pkg_config.bzl%pkg_config",
-            "attributes": {
-              "pkg": "libadwaita-1"
-            }
-          }
-        }
-      }
-    },
     "@@pybind11_bazel+//:internal_configure.bzl%internal_configure_extension": {
       "general": {
         "bzlTransitiveDigest": "06cynZ1bCvvy8zHPrrDlXq+Z68xmjctHpfFxi+zEpJY=",
@@ -530,6 +503,45 @@
                 ]
               },
               "toolchain_target_settings": {}
+            }
+          }
+        }
+      }
+    },
+    "@@rules_system_deps+//extensions:extensions.bzl%pkg_config_ext": {
+      "general": {
+        "bzlTransitiveDigest": "eiqXzYa7NurVBM1C4q3UuMwkYC4vWLyRmjUPr8JmILg=",
+        "usagesDigest": "IqPwuovg5O2kZE3Jcan9bcbzGWcJAe5RLtVy2aRXT9I=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {
+          "glib": {
+            "repoRuleId": "@@rules_system_deps+//private:pkg_config_repo.bzl%pkg_config",
+            "attributes": {
+              "pkg": "glib-2.0",
+              "target_name": "glib"
+            }
+          },
+          "gtk4": {
+            "repoRuleId": "@@rules_system_deps+//private:pkg_config_repo.bzl%pkg_config",
+            "attributes": {
+              "pkg": "gtk4",
+              "target_name": "gtk4"
+            }
+          },
+          "libadwaita": {
+            "repoRuleId": "@@rules_system_deps+//private:pkg_config_repo.bzl%pkg_config",
+            "attributes": {
+              "pkg": "libadwaita-1",
+              "target_name": "libadwaita"
+            }
+          },
+          "pkg_config_go": {
+            "repoRuleId": "@@rules_system_deps+//private:go_pkg_config_repo.bzl%go_pkg_config",
+            "attributes": {
+              "profile_specs": [
+                "gtk4|@glib//:glib,@gtk4//:gtk4",
+                "adwaita|@glib//:glib,@gtk4//:gtk4,@libadwaita//:libadwaita"
+              ]
             }
           }
         }

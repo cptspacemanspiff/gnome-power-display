@@ -1,5 +1,8 @@
 # Bazel
 bazel-*
+.bazel_*
+.bazelrc.local
+.cache/
 
 # GNOME extension compiled schemas
 gnome-extension/schemas/gschemas.compiled
