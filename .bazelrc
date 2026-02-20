@@ -1,5 +1,3 @@
-try-import %workspace%/.bazelrc.local
-
 build --action_env=CGO_ENABLED=1
 build --host_action_env=CGO_ENABLED=1
 
@@ -8,6 +6,10 @@ build --disk_cache=~/.cache/bazel-disk-cache
 
 # Use all available cores for CGo compilation
 build --jobs=HOST_CPUS
+
+# Local overrides (e.g. CI sets --disk_cache to a workspace-relative path)
+# Must be last so it overrides settings above
+try-import %workspace%/.bazelrc.local
 # # Force Bazel to resolve C++ toolchains using platforms
 # build --incompatible_enable_cc_toolchain_resolution
 # # Prevent Bazel from falling back to the local host's GCC/Clang
