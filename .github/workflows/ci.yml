@@ -104,9 +104,19 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .cache/bazel-disk-cache
-          key: bazel-${{ runner.os }}-${{ hashFiles('MODULE.bazel.lock', 'go.mod') }}
+          key: bazel-${{ runner.os }}-${{ github.sha }}
           restore-keys: |
             bazel-${{ runner.os }}-
+
+      - name: Bazel build
+        uses: devcontainers/ci@v0.3
+        with:
+          configFile: .devcontainer/ci-generated/devcontainer.json
+          push: never
+          runCmd: |
+            set -e
+            cp .bazelrc.ci .bazelrc.local
+            bazel build //...
 
       - name: Bazel test
         uses: devcontainers/ci@v0.3
@@ -117,13 +127,3 @@ jobs:
             set -e
             cp .bazelrc.ci .bazelrc.local
             bazel test //...
-
-      - name: Bazel build
-        uses: devcontainers/ci@v0.3
-        with:
-          configFile: .devcontainer/ci-generated/devcontainer.json
-          push: never
-          runCmd: |
-            set -e
-            cp .bazelrc.ci .bazelrc.local
-            bazel build //cmd/power-monitor-daemon //cmd/power-calibrate
