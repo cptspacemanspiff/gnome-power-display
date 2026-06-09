@@ -317,9 +317,13 @@ func (d *DB) InsertPowerStateEvent(e collector.PowerStateEvent) (bool, error) {
 
 // PowerStateEventsInRange returns power state events within the given time range.
 func (d *DB) PowerStateEventsInRange(from, to int64) ([]collector.PowerStateEvent, error) {
+	// Match any event that OVERLAPS the window, not just those starting in it.
+	// A power state event is an interval [start_time, end_time]; filtering on
+	// start_time alone drops long suspends when the window falls in their
+	// middle/end, causing the gap to render as "No data" instead of "Sleep".
 	rows, err := d.db.Query(
-		"SELECT start_time, end_time, type, suspend_secs, hibernate_secs FROM power_state_events WHERE start_time >= ? AND start_time <= ? ORDER BY start_time",
-		from, to,
+		"SELECT start_time, end_time, type, suspend_secs, hibernate_secs FROM power_state_events WHERE start_time <= ? AND end_time >= ? ORDER BY start_time",
+		to, from,
 	)
 	if err != nil {
 		return nil, err

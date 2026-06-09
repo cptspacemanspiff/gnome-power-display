@@ -1,0 +1,13 @@
+[Desktop Entry]
+Name=Power Monitor
+Comment=Live power draw, battery, and brightness from the power-monitor daemon
+Type=Application
+Icon=battery-symbolic
+Exec=cosmic-power-monitor
+Terminal=false
+Categories=COSMIC;
+Keywords=COSMIC;power;battery;watts;
+NoDisplay=true
+X-CosmicApplet=true
+X-CosmicHoverPopup=Auto
+X-OverflowPriority=10

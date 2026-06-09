@@ -1,0 +1,42 @@
+name := 'cosmic-power-monitor'
+appid := 'com.github.nlong.CosmicPowerMonitor'
+
+rootdir := ''
+prefix := '/usr'
+base-dir := absolute_path(clean(rootdir / prefix))
+
+bin-src := 'target/release' / name
+bin-dst := base-dir / 'bin' / name
+desktop-src := 'resources' / appid + '.desktop'
+desktop-dst := base-dir / 'share' / 'applications' / appid + '.desktop'
+metainfo-src := 'resources' / appid + '.metainfo.xml'
+metainfo-dst := base-dir / 'share' / 'metainfo' / appid + '.metainfo.xml'
+
+# Local (no-root) install targets.
+local-bin-dst := absolute_path(env('HOME') / '.local' / 'bin' / name)
+local-desktop-dst := absolute_path(env('HOME') / '.local' / 'share' / 'applications' / appid + '.desktop')
+
+default: build-release
+
+build-debug:
+    cargo build
+
+build-release:
+    cargo build --release
+
+# System-wide install (run with sudo).
+install: build-release
+    install -Dm0755 {{bin-src}} {{bin-dst}}
+    install -Dm0644 {{desktop-src}} {{desktop-dst}}
+    install -Dm0644 {{metainfo-src}} {{metainfo-dst}}
+
+uninstall:
+    rm -f {{bin-dst}} {{desktop-dst}} {{metainfo-dst}}
+
+# Per-user install, no root needed. Ensure ~/.local/bin is on PATH.
+dev-install: build-release
+    install -Dm0755 {{bin-src}} {{local-bin-dst}}
+    install -Dm0644 {{desktop-src}} {{local-desktop-dst}}
+
+dev-uninstall:
+    rm -f {{local-bin-dst}} {{local-desktop-dst}}

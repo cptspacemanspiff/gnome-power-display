@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="addon">
+  <id>com.github.nlong.CosmicPowerMonitor</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>Power Monitor</name>
+  <summary>Live power draw in the COSMIC panel</summary>
+  <description>
+    <p>
+      A COSMIC panel applet that shows the system's current power draw in watts,
+      with a popup for battery percentage, charge status, and display brightness.
+      It reads data from the power-monitor daemon over the system D-Bus interface
+      org.gnome.PowerMonitor.
+    </p>
+  </description>
+</component>

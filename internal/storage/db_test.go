@@ -154,3 +154,38 @@ func TestInsertPowerStateEvent_DeduplicatesByStartTime(t *testing.T) {
 	}
 }
 
+// A long suspend whose start_time precedes the window must still be returned
+// when the window falls inside it; otherwise the gap renders as "No data"
+// instead of a sleep region.
+func TestPowerStateEventsInRange_ReturnsOverlappingEvents(t *testing.T) {
+	db := openTestDB(t)
+
+	// Long suspend [100, 200]; deliberately pick windows that exclude its start.
+	if _, err := db.InsertPowerStateEvent(collector.PowerStateEvent{
+		StartTime: 100, EndTime: 200, Type: "suspend", SuspendSecs: 100,
+	}); err != nil {
+		t.Fatalf("InsertPowerStateEvent() error = %v", err)
+	}
+
+	cases := []struct {
+		name     string
+		from, to int64
+		want     int
+	}{
+		{"window inside event (no start)", 130, 170, 1},
+		{"window over event end", 150, 250, 1},
+		{"window over event start", 50, 150, 1},
+		{"window fully before event", 0, 50, 0},
+		{"window fully after event", 250, 300, 0},
+	}
+	for _, c := range cases {
+		events, err := db.PowerStateEventsInRange(c.from, c.to)
+		if err != nil {
+			t.Fatalf("%s: PowerStateEventsInRange() error = %v", c.name, err)
+		}
+		if len(events) != c.want {
+			t.Fatalf("%s: len = %d, want %d", c.name, len(events), c.want)
+		}
+	}
+}
+
