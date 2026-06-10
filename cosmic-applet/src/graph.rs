@@ -16,7 +16,7 @@ use crate::dbus::{HistSample, PowerEvent};
 
 // ---- Geometry ----
 
-pub const GRAPH_W: f32 = 420.0;
+pub const GRAPH_W: f32 = 540.0;
 pub const GRAPH_H: f32 = 120.0;
 const M_TOP: f32 = 18.0;
 const M_RIGHT: f32 = 32.0;

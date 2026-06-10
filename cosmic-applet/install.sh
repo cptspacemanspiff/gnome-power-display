@@ -36,6 +36,7 @@ Commands:
   install     build, then copy the 3 files into ~/.local (no root)
   uninstall   remove the 3 installed files
   list        show what is installed and whether each file exists
+  restart     restart cosmic-panel so a running applet reloads
   clean       cargo clean (removes ./target build artifacts)
 
 After 'install', add it via COSMIC Settings > Desktop > Panel (or Dock)
@@ -46,6 +47,17 @@ EOF
 build() {
     echo ">> cargo build --release"
     cargo build --release
+}
+
+# Restart the COSMIC panel so it respawns the applet with the freshly installed
+# binary. cosmic-session relaunches cosmic-panel automatically after it exits.
+restart_panel() {
+    if pgrep -x cosmic-panel >/dev/null 2>&1; then
+        echo ">> restarting cosmic-panel to reload the applet"
+        pkill -x cosmic-panel || true
+    else
+        echo ">> cosmic-panel not running; skipping restart"
+    fi
 }
 
 do_install() {
@@ -61,6 +73,7 @@ do_install() {
         echo "!! ~/.local/bin is not on your PATH; add it so the panel can exec the applet:"
         echo "     export PATH=\"\$HOME/.local/bin:\$PATH\""
     fi
+    restart_panel
     echo ">> done. Add it from COSMIC Settings > Desktop > Panel > Add applet."
 }
 
@@ -81,6 +94,7 @@ case "${1:-}" in
     install) do_install ;;
     uninstall) do_uninstall ;;
     list) do_list ;;
+    restart) restart_panel ;;
     clean) echo ">> cargo clean"; cargo clean ;;
     *) usage; exit 1 ;;
 esac

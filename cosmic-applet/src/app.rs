@@ -306,8 +306,8 @@ impl cosmic::Application for AppModel {
                     None,
                 );
                 settings.positioner.size_limits = Limits::NONE
-                    .max_width(480.0)
-                    .min_width(580.0)
+                    .max_width(620.0)
+                    .min_width(560.0)
                     .min_height(200.0)
                     .max_height(900.0);
                 return Task::batch([get_popup(settings), self.refresh()]);
@@ -321,13 +321,21 @@ impl cosmic::Application for AppModel {
             Some(s) if self.available => format!("{:.1} W", s.battery.watts()),
             _ => "?? W".to_string(),
         };
-        self.core
+        let button = self
+            .core
             .applet
             .text(label)
+            // Keep the watts on one line. Without this the label wraps and the
+            // " W" drops to a clipped second line, showing only the top of the
+            // "W" as three dots under the number.
+            .wrapping(cosmic::iced::widget::text::Wrapping::None)
             .apply(widget::button::custom)
             .class(cosmic::theme::Button::AppletIcon)
-            .on_press(Message::TogglePopup)
-            .into()
+            .on_press(Message::TogglePopup);
+        // Wrap in autosize_window so the panel surface sizes to the text width.
+        // The framework calls view() raw (no auto-wrapping), so without this the
+        // button is pinned to an icon-square width and the "W" gets clipped.
+        self.core.applet.autosize_window(button).into()
     }
 
     fn view_window(&self, _id: Id) -> Element<'_, Message> {
@@ -365,30 +373,33 @@ impl cosmic::Application for AppModel {
             _ => widget::text::body("Daemon unavailable. Is power-monitor-daemon running?").into(),
         };
 
-        // Nav row: back button + range presets. The range buttons use Fill
-        // width so the row always fits the popup instead of overflowing (which
-        // clipped the last preset, e.g. "7d", when the back button was shown).
-        let mut nav = widget::Row::new().spacing(4).width(Length::Fill);
+        // Nav row: back button + range presets. A flex_row wraps the buttons
+        // onto additional lines when they don't all fit the popup width,
+        // instead of overflowing the window and clipping the rightmost presets
+        // (e.g. "7d", and "24h" too once the back button appears).
+        let mut nav_items: Vec<Element<'_, Message>> = Vec::new();
         if self.show_back() {
-            nav = nav.push(
+            nav_items.push(
                 widget::button::text("◀")
                     .on_press(Message::ZoomBack)
-                    .class(cosmic::theme::Button::Standard),
+                    .class(cosmic::theme::Button::Standard)
+                    .into(),
             );
         }
         for (i, (label, _)) in TIME_RANGES.iter().enumerate() {
             let selected = self.custom.is_none() && self.range_idx == i;
-            nav = nav.push(
+            nav_items.push(
                 widget::button::text(*label)
-                    .width(Length::Fill)
                     .on_press(Message::SelectRange(i))
                     .class(if selected {
                         cosmic::theme::Button::Suggested
                     } else {
                         cosmic::theme::Button::Standard
-                    }),
+                    })
+                    .into(),
             );
         }
+        let nav = widget::flex_row(nav_items).spacing(4).width(Length::Fill);
 
         let battery = widget::canvas(BatteryChart {
             data: data.clone(),
@@ -421,9 +432,19 @@ impl cosmic::Application for AppModel {
 
         content = content.push(battery).push(energy);
 
+        // popup_container() autosizes content but hard-caps width at 360px,
+        // which clipped the graphs and forced the nav buttons to wrap. Override
+        // its limits so the popup can size up to our wider graph (GRAPH_W).
         self.core
             .applet
             .popup_container(padded_control(content))
+            .limits(
+                Limits::NONE
+                    .min_width(360.0)
+                    .max_width(620.0)
+                    .min_height(1.0)
+                    .max_height(1000.0),
+            )
             .into()
     }
 
