@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.cptspacemanspiff.PowerMonitor.Gui</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0</project_license>
+  <name>Power Monitor</name>
+  <summary>Battery, power draw, and energy history</summary>
+  <launchable type="desktop-id">io.github.cptspacemanspiff.PowerMonitor.Gui.desktop</launchable>
+  <description>
+    <p>
+      A GTK desktop application that visualizes battery level, power draw, energy
+      usage, and sleep history collected by the power-monitor daemon. It reads data
+      over the system D-Bus interface org.gnome.PowerMonitor.
+    </p>
+  </description>
+</component>

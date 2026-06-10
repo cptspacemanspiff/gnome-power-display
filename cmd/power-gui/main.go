@@ -33,7 +33,7 @@ var sidebarEntries = []sidebarEntry{
 }
 
 func main() {
-	app := adw.NewApplication("org.gnome.PowerMonitorGUI", gio.ApplicationFlagsNone)
+	app := adw.NewApplication("io.github.cptspacemanspiff.PowerMonitor.Gui", gio.ApplicationFlagsNone)
 	app.ConnectActivate(func() { activate(app) })
 	if code := app.Run(os.Args); code > 0 {
 		os.Exit(code)

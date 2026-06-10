@@ -1,6 +1,6 @@
 # GNOME Power Display
 
-GNOME power monitoring suite: a Go daemon that collects battery/power/backlight/sleep data, a calibration tool for display power measurement, and a GNOME Shell extension for visualization.
+Power monitoring suite: a Go daemon that collects battery/power/backlight/sleep data, a calibration tool for display power measurement, and three visualization frontends — a GNOME Shell extension, a GTK desktop app, and a COSMIC panel applet. All frontends read from the daemon over the system D-Bus interface `org.gnome.PowerMonitor`.
 
 ## Build
 
@@ -26,13 +26,52 @@ sudo bazel-bin/cmd/power-calibrate/power-calibrate_/power-calibrate
 ```
 cmd/power-monitor-daemon/     Daemon: collects data, exposes D-Bus service
 cmd/power-calibrate/          CLI tool: measures display power at brightness levels
+cmd/power-gui/                GTK desktop app (client): battery/power/energy graphs
 internal/collector/           Battery, backlight, process, CPU freq, sleep data collection
 internal/storage/             SQLite storage with WAL mode
 internal/dbus/                D-Bus service (org.gnome.PowerMonitor) on system bus
 internal/config/              TOML config loading with validation
 internal/calibration/         CPU pinning, brightness control, power sampling, latency measurement
 gnome-extension/              GNOME 45-49 Shell extension (panel button, graphs, zoom)
+cosmic-applet/                COSMIC panel applet (Rust, Cargo build)
+packaging/                    nfpm RPM/DEB configs + systemd/dbus/desktop assets
+scripts/install-packages.sh   Single entry point: build + install all packages
 ```
+
+## Packaging & Installation
+
+Everything installs **system-wide to `/usr` via RPM/DEB** — there is no per-user
+`~/.local` install path. One command builds and installs all four packages:
+
+```bash
+scripts/install-packages.sh install      # build + install (dnf/apt)
+scripts/install-packages.sh reinstall    # rebuild + reinstall in place
+scripts/install-packages.sh uninstall    # remove all four packages
+scripts/install-packages.sh status       # show installed versions + daemon status
+```
+
+**Four packages**, each frontend independent, all depending on `power-monitor-daemon`:
+
+| Package | Build | Installs |
+|---|---|---|
+| `power-monitor-daemon` | bazel | `/usr/bin/power-monitor-{daemon,calibrate}`, systemd units, dbus policy, `/etc/power-monitor/config.toml` |
+| `power-monitor-gui` | bazel | `/usr/bin/power-monitor-gui`, desktop + icon + metainfo |
+| `power-monitor-gnome-extension` | bazel | `/usr/share/gnome-shell/extensions/power-monitor@gnome-power-display/`, gschema |
+| `power-monitor-cosmic` | cargo | `/usr/bin/power-monitor-cosmic`, desktop + metainfo |
+
+The three bazel packages come from `//packaging:{daemon,gui,extension}-{rpm,deb}`. The
+COSMIC applet is a Cargo build, so `install-packages.sh` runs `cargo build --release` and
+packs it with nfpm directly (`packaging/nfpm-cosmic.yaml`) into `dist/`.
+
+**Naming conventions** (standardized — keep new code consistent with these):
+- Binaries are `power-monitor-*`. Frontend app IDs are under
+  `io.github.cptspacemanspiff.PowerMonitor.*` (`.Gui`, `.Cosmic`).
+- The D-Bus interface `org.gnome.PowerMonitor` and the GNOME extension UUID
+  `power-monitor@gnome-power-display` / gschema `org.gnome.shell.extensions.power-monitor`
+  are **unchanged** — they are published/GNOME-mandated contracts.
+- Note: the daemon and calibrate **Bazel** targets are still `//cmd/power-monitor-daemon`
+  and `//cmd/power-calibrate`; only the *installed* binary names carry the `power-monitor-`
+  prefix (set via the nfpm `dst`, see `packaging/nfpm-*.yaml`).
 
 ## Power Monitor Daemon
 
@@ -130,10 +169,10 @@ GNOME 45-49 ESM extension at `gnome-extension/`. UUID: `power-monitor@gnome-powe
 
 ### Development Workflow
 
-```bash
-# Install (run once — symlinks source dir, no copying needed)
-./gnome-extension/install.sh install
+`gnome-extension/install.sh` is now a **dev-only helper** (no install command — the real
+install is the `power-monitor-gnome-extension` package via `scripts/install-packages.sh`):
 
+```bash
 # Test in nested GNOME Shell (auto-enables extension and starts daemon)
 ./gnome-extension/install.sh nested
 
@@ -144,7 +183,7 @@ GNOME 45-49 ESM extension at `gnome-extension/`. UUID: `power-monitor@gnome-powe
 ./gnome-extension/install.sh log
 ```
 
-The `nested` command uses `dbus-run-session -- gnome-shell --devkit --wayland` (requires `mutter-devel` on Fedora). It launches a GNOME Shell window, waits for D-Bus, enables the extension, and starts the daemon automatically.
+The `nested` command uses `dbus-run-session -- gnome-shell --devkit --wayland` (requires `mutter-devel` on Fedora). It launches a GNOME Shell window, waits for D-Bus, enables the extension, and starts the daemon automatically. It symlinks the source into `~/.local/share/gnome-shell/extensions/` as a throwaway dev sandbox — not a system install.
 
 On Wayland, there is no way to reload GNOME Shell without logging out. The nested session avoids this for development.
 
@@ -157,7 +196,8 @@ On Wayland, there is no way to reload GNOME Shell without logging out. The neste
 
 ## Display Calibration Tool
 
-`power-calibrate` is a separate root CLI that measures display power consumption and writes results to `~/.config/power-monitor/calibration.json`. When run via `sudo`, it detects `SUDO_USER` and writes to the real user's home directory with correct ownership.
+A separate root CLI (Bazel target `//cmd/power-calibrate`, installed as
+`/usr/bin/power-monitor-calibrate` by the daemon package) measures display power consumption and writes results to `~/.config/power-monitor/calibration.json`. When run via `sudo`, it detects `SUDO_USER` and writes to the real user's home directory with correct ownership.
 
 ### How it works
 

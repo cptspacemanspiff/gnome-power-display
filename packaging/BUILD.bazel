@@ -22,6 +22,18 @@ filegroup(
     visibility = ["//visibility:public"],
 )
 
+filegroup(
+    name = "gui-files",
+    srcs = [
+        "PowerLog_logo.png",
+        "io.github.cptspacemanspiff.PowerMonitor.Gui.desktop",
+        "io.github.cptspacemanspiff.PowerMonitor.Gui.metainfo.xml",
+        "postinstall-gui.sh",
+        "postremove-gui.sh",
+    ],
+    visibility = ["//visibility:public"],
+)
+
 # Daemon package (binary + systemd service)
 
 nfpm_pkg(
@@ -30,11 +42,13 @@ nfpm_pkg(
     srcs = [
         "config.toml",
         ":service-files",
+        "//cmd/power-calibrate",
         "//cmd/power-monitor-daemon",
     ],
     config = "nfpm-daemon.yaml",
     file_map = {
         "power-monitor-daemon_/power-monitor-daemon": "build/power-monitor-daemon",
+        "power-calibrate_/power-calibrate": "build/power-monitor-calibrate",
     },
     packager = "rpm",
     version = "0.1.0",
@@ -46,11 +60,45 @@ nfpm_pkg(
     srcs = [
         "config.toml",
         ":service-files",
+        "//cmd/power-calibrate",
         "//cmd/power-monitor-daemon",
     ],
     config = "nfpm-daemon.yaml",
     file_map = {
         "power-monitor-daemon_/power-monitor-daemon": "build/power-monitor-daemon",
+        "power-calibrate_/power-calibrate": "build/power-monitor-calibrate",
+    },
+    packager = "deb",
+    version = "0.1.0",
+)
+
+# GUI package (GTK desktop app; depends on daemon)
+
+nfpm_pkg(
+    name = "gui-rpm",
+    package_name = "power-monitor-gui",
+    srcs = [
+        ":gui-files",
+        "//cmd/power-gui",
+    ],
+    config = "nfpm-gui.yaml",
+    file_map = {
+        "power-gui_/power-gui": "build/power-monitor-gui",
+    },
+    packager = "rpm",
+    version = "0.1.0",
+)
+
+nfpm_pkg(
+    name = "gui-deb",
+    package_name = "power-monitor-gui",
+    srcs = [
+        ":gui-files",
+        "//cmd/power-gui",
+    ],
+    config = "nfpm-gui.yaml",
+    file_map = {
+        "power-gui_/power-gui": "build/power-monitor-gui",
     },
     packager = "deb",
     version = "0.1.0",

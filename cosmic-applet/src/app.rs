@@ -164,7 +164,7 @@ impl cosmic::Application for AppModel {
     type Flags = ();
     type Message = Message;
 
-    const APP_ID: &'static str = "com.github.nlong.CosmicPowerMonitor";
+    const APP_ID: &'static str = "io.github.cptspacemanspiff.PowerMonitor.Cosmic";
 
     fn core(&self) -> &Core {
         &self.core

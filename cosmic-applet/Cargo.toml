@@ -6,7 +6,7 @@ description = "COSMIC panel applet showing live power draw from the power-monito
 license = "MIT"
 
 [[bin]]
-name = "cosmic-power-monitor"
+name = "power-monitor-cosmic"
 path = "src/main.rs"
 
 [dependencies]

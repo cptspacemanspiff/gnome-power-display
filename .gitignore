@@ -6,3 +6,9 @@ bazel-*
 
 # GNOME extension compiled schemas
 gnome-extension/schemas/gschemas.compiled
+
+# Packaging output (cosmic applet package built outside bazel)
+dist/
+
+# Rust build artifacts
+cosmic-applet/target/

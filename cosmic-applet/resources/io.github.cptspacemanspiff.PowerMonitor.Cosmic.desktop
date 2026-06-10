@@ -2,8 +2,8 @@
 Name=Power Monitor
 Comment=Live power draw, battery, and brightness from the power-monitor daemon
 Type=Application
-Icon=battery-symbolic
-Exec=cosmic-power-monitor
+Icon=io.github.cptspacemanspiff.PowerMonitor.Cosmic
+Exec=power-monitor-cosmic
 Terminal=false
 Categories=COSMIC;
 Keywords=COSMIC;power;battery;watts;

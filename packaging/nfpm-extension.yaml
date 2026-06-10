@@ -1,7 +1,7 @@
 name: power-monitor-gnome-extension
 arch: amd64
 platform: linux
-version: v${VERSION}
+version: ${VERSION}
 maintainer: Nicholas Long
 description: >
   GNOME Shell extension for visualizing power monitoring data.

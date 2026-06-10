@@ -1,7 +1,7 @@
 name: power-monitor-daemon
 arch: amd64
 platform: linux
-version: v${VERSION}
+version: ${VERSION}
 maintainer: Nicholas Long
 description: >
   Power monitoring daemon that collects battery, backlight, and sleep data
@@ -13,6 +13,9 @@ license: GPL-3.0
 contents:
   - src: ./build/power-monitor-daemon
     dst: /usr/bin/power-monitor-daemon
+
+  - src: ./build/power-monitor-calibrate
+    dst: /usr/bin/power-monitor-calibrate
 
   - src: ./packaging/power-monitor-daemon.service
     dst: /usr/lib/systemd/system/power-monitor-daemon.service

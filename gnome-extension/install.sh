@@ -1,24 +1,21 @@
 #!/bin/bash
+# Dev helper for the GNOME Power Monitor extension.
+#
+# This is for local iteration only (nested-shell testing, schema compiles, log
+# tailing). The supported install path is the system package: from the repo root
+# run `scripts/install-packages.sh install`, which installs the extension into
+# /usr/share/gnome-shell/extensions via RPM/DEB.
 set -e
 
 EXT_UUID="power-monitor@gnome-power-display"
 EXT_DIR="$HOME/.local/share/gnome-shell/extensions/$EXT_UUID"
 SRC_DIR="$(dirname "$(readlink -f "$0")")"
 
-case "${1:-install}" in
-    install)
-        rm -rf "$EXT_DIR"
-        ln -sfn "$SRC_DIR" "$EXT_DIR"
-        glib-compile-schemas "$SRC_DIR/schemas"
-        echo "Symlinked $EXT_DIR -> $SRC_DIR"
-        echo "Schemas compiled."
-        gnome-extensions enable "$EXT_UUID" 2>/dev/null \
-            && echo "Extension enabled." \
-            || echo "Log out and back in, then: gnome-extensions enable $EXT_UUID"
-        ;;
+case "${1:-}" in
     nested)
         glib-compile-schemas "$SRC_DIR/schemas"
-        # Ensure symlink exists
+        # The nested shell loads extensions from the user dir, so symlink the
+        # source into it as a throwaway dev sandbox (not a system install).
         if [ ! -L "$EXT_DIR" ]; then
             rm -rf "$EXT_DIR"
             ln -sfn "$SRC_DIR" "$EXT_DIR"
@@ -58,24 +55,16 @@ case "${1:-install}" in
         glib-compile-schemas "$SRC_DIR/schemas"
         echo "Schemas compiled."
         ;;
-    uninstall)
-        gnome-extensions disable "$EXT_UUID" 2>/dev/null && echo "Extension disabled." || true
-        if [ -L "$EXT_DIR" ] || [ -e "$EXT_DIR" ]; then
-            rm -rf "$EXT_DIR"
-            echo "Removed $EXT_DIR"
-        else
-            echo "Extension not installed."
-        fi
-        ;;
     log)
         journalctl -f /usr/bin/gnome-shell -o cat | grep -i --line-buffered power
         ;;
     *)
-        echo "Usage: $0 {install|uninstall|nested|schemas|log}"
-        echo "  install   - Symlink extension to GNOME extensions dir (run once)"
-        echo "  uninstall - Disable and remove the extension"
-        echo "  nested    - Launch nested GNOME Shell with extension auto-enabled"
-        echo "  schemas   - Recompile gsettings schemas"
-        echo "  log       - Tail GNOME Shell logs filtered for this extension"
+        echo "Usage: $0 {nested|schemas|log}"
+        echo "  nested  - Launch nested GNOME Shell with extension auto-enabled (dev sandbox)"
+        echo "  schemas - Recompile gsettings schemas"
+        echo "  log     - Tail GNOME Shell logs filtered for this extension"
+        echo
+        echo "To install for real, use the system package:"
+        echo "  (repo root) scripts/install-packages.sh install"
         ;;
 esac

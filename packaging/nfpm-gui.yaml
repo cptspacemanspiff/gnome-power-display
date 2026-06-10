@@ -1,0 +1,36 @@
+name: power-monitor-gui
+arch: amd64
+platform: linux
+version: ${VERSION}
+maintainer: Nicholas Long
+description: >
+  GTK desktop application for visualizing power-monitor data:
+  battery level, power draw, energy usage, and sleep history.
+vendor: gnome-power-display
+homepage: https://github.com/cptspacemanspiff/gnome-power-display
+license: GPL-3.0
+
+depends:
+  - power-monitor-daemon = ${VERSION}
+
+contents:
+  - src: ./build/power-monitor-gui
+    dst: /usr/bin/power-monitor-gui
+
+  - src: ./packaging/io.github.cptspacemanspiff.PowerMonitor.Gui.desktop
+    dst: /usr/share/applications/io.github.cptspacemanspiff.PowerMonitor.Gui.desktop
+
+  - src: ./packaging/io.github.cptspacemanspiff.PowerMonitor.Gui.metainfo.xml
+    dst: /usr/share/metainfo/io.github.cptspacemanspiff.PowerMonitor.Gui.metainfo.xml
+
+  - src: ./packaging/PowerLog_logo.png
+    dst: /usr/share/icons/hicolor/256x256/apps/io.github.cptspacemanspiff.PowerMonitor.Gui.png
+
+scripts:
+  postinstall: ./packaging/postinstall-gui.sh
+  postremove: ./packaging/postremove-gui.sh
+
+rpm:
+  group: Applications/System
+
+deb: {}

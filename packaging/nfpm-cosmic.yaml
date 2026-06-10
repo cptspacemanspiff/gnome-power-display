@@ -1,0 +1,32 @@
+name: power-monitor-cosmic
+arch: amd64
+platform: linux
+version: ${VERSION}
+maintainer: Nicholas Long
+description: >
+  COSMIC panel applet showing live power draw, battery, and brightness
+  from the power-monitor daemon.
+vendor: gnome-power-display
+homepage: https://github.com/cptspacemanspiff/gnome-power-display
+license: MIT
+
+depends:
+  - power-monitor-daemon = ${VERSION}
+
+# Built with Cargo (not Bazel). install-packages.sh runs `cargo build --release`
+# in cosmic-applet/ and then invokes nfpm directly with this config from the repo
+# root, so all src paths below are relative to the repo root.
+contents:
+  - src: ./cosmic-applet/target/release/power-monitor-cosmic
+    dst: /usr/bin/power-monitor-cosmic
+
+  - src: ./cosmic-applet/resources/io.github.cptspacemanspiff.PowerMonitor.Cosmic.desktop
+    dst: /usr/share/applications/io.github.cptspacemanspiff.PowerMonitor.Cosmic.desktop
+
+  - src: ./cosmic-applet/resources/io.github.cptspacemanspiff.PowerMonitor.Cosmic.metainfo.xml
+    dst: /usr/share/metainfo/io.github.cptspacemanspiff.PowerMonitor.Cosmic.metainfo.xml
+
+rpm:
+  group: Applications/System
+
+deb: {}

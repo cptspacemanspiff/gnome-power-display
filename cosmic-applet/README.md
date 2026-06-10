@@ -15,30 +15,27 @@ COSMIC counterpart to the GNOME Shell extension in `../gnome-extension`.
 - The `power-monitor-daemon` running on the system bus.
 - Rust (edition 2024; tested with 1.94). `libcosmic` is pulled from git, so the
   first build downloads and compiles it — expect several minutes.
-- Optional: [`just`](https://github.com/casey/just) for the install recipes
-  (`cargo install just`). Without it, use the raw `cargo`/`install` commands.
+- Optional: [`just`](https://github.com/casey/just) for the build recipes
+  (`cargo install just`).
 
-## Install / uninstall
+## Install
 
-Use `install.sh` (no root, no `just` required). A user-local install touches
-exactly three files in standard XDG dirs, and `uninstall` removes precisely
-those — nothing is scattered around:
+The supported install path is the **system package**, built and installed from the repo
+root along with the daemon it depends on:
 
 ```bash
-./install.sh install      # cargo build --release + copy 3 files to ~/.local
-./install.sh list         # show what is installed
-./install.sh uninstall    # remove the 3 files
-./install.sh clean        # cargo clean (drops ./target build artifacts)
+# from the repo root
+./scripts/install-packages.sh install      # builds + installs all packages
+./scripts/install-packages.sh uninstall    # removes them
 ```
 
-Installed files:
-- `~/.local/bin/cosmic-power-monitor`
-- `~/.local/share/applications/com.github.nlong.CosmicPowerMonitor.desktop`
-- `~/.local/share/metainfo/com.github.nlong.CosmicPowerMonitor.metainfo.xml`
+The COSMIC package installs three files:
+- `/usr/bin/power-monitor-cosmic`
+- `/usr/share/applications/io.github.cptspacemanspiff.PowerMonitor.Cosmic.desktop`
+- `/usr/share/metainfo/io.github.cptspacemanspiff.PowerMonitor.Cosmic.metainfo.xml`
 
-Make sure `~/.local/bin` is on your `PATH` so the panel can exec the binary.
-
-(A `justfile` with the same recipes is also provided if you prefer `just`.)
+For local iteration, `./install.sh build` (or `just build-release`) compiles the binary
+and `./install.sh restart` restarts `cosmic-panel` to reload a running applet.
 
 ## Add it to the panel
 

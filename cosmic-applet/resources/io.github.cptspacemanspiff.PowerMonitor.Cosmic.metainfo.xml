@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="addon">
-  <id>com.github.nlong.CosmicPowerMonitor</id>
+  <id>io.github.cptspacemanspiff.PowerMonitor.Cosmic</id>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MIT</project_license>
   <name>Power Monitor</name>
