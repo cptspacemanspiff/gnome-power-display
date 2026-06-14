@@ -12,3 +12,5 @@ dist/
 
 # Rust build artifacts
 cosmic-applet/target/
+
+__pycache__

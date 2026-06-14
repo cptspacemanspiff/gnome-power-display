@@ -1,0 +1,24 @@
+[project]
+name = "powercal"
+version = "0.1.0"
+description = "Average battery power from a monotonic charge counter, with statistical and guaranteed error bars"
+readme = "README.md"
+requires-python = ">=3.13"
+license = { text = "MIT" }
+dependencies = []
+
+[project.scripts]
+powercal = "powercal.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/powercal"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[dependency-groups]
+dev = ["pytest>=8"]
