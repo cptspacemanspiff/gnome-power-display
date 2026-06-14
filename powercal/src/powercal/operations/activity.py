@@ -16,6 +16,7 @@ import fcntl
 import os
 import struct
 import threading
+import time
 from typing import Callable, Optional
 
 from .scenario import Setup, Teardown
@@ -37,6 +38,7 @@ _UI_DEV_DESTROY = _IOC(0, "U", 2, 0)
 
 _EV_SYN, _EV_KEY, _EV_REL = 0x00, 0x01, 0x02
 _REL_X = 0x00
+_REL_Y = 0x01
 _SYN_REPORT = 0x00
 _BTN_LEFT = 0x110
 
@@ -46,22 +48,35 @@ class VirtualMouse:
 
     def __init__(self, device: str = UINPUT) -> None:
         self._fd = os.open(device, os.O_WRONLY | os.O_NONBLOCK)
+        # libinput only classifies a relative device as a pointer if it advertises BOTH REL_X and
+        # REL_Y; with a single axis it logs "device has only one relative axis, ignoring" and drops
+        # it -- so the synthetic motion never reaches the compositor's input idle timer. Declare both.
         for ioc, bit in [(_UI_SET_EVBIT, _EV_KEY), (_UI_SET_KEYBIT, _BTN_LEFT),
-                         (_UI_SET_EVBIT, _EV_REL), (_UI_SET_RELBIT, _REL_X)]:
+                         (_UI_SET_EVBIT, _EV_REL), (_UI_SET_RELBIT, _REL_X),
+                         (_UI_SET_RELBIT, _REL_Y)]:
             fcntl.ioctl(self._fd, ioc, bit)
         # struct uinput_setup: input_id{bustype,vendor,product,version} + name[80] + ff_effects_max
         setup = struct.pack("HHHH80sI", 0x03, 0x1234, 0x5678, 1, b"powercal-keepawake", 0)
         fcntl.ioctl(self._fd, _UI_DEV_SETUP, setup)
         fcntl.ioctl(self._fd, _UI_DEV_CREATE)
+        # Give udev + the compositor a moment to open the new device, else the first jiggles land
+        # before anything is listening and are silently lost.
+        time.sleep(0.5)
 
     def _emit(self, etype: int, code: int, value: int) -> None:
         os.write(self._fd, struct.pack("llHHi", 0, 0, etype, code, value))
 
     def jiggle(self) -> None:
-        """Move +1px then -1px so the cursor lands where it started but input is registered."""
+        """Move +1px then -1px on both axes so the cursor lands where it started but input registers.
+
+        Both axes are moved (not just X) so the report is unambiguously pointer motion and the net
+        displacement is zero on each axis.
+        """
         self._emit(_EV_REL, _REL_X, 1)
+        self._emit(_EV_REL, _REL_Y, 1)
         self._emit(_EV_SYN, _SYN_REPORT, 0)
         self._emit(_EV_REL, _REL_X, -1)
+        self._emit(_EV_REL, _REL_Y, -1)
         self._emit(_EV_SYN, _SYN_REPORT, 0)
 
     def close(self) -> None:
